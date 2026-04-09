@@ -21,6 +21,9 @@ sudo apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::=
 
 # 2. Install Python 3.11
 echo ">>> [2/7] Installing Python 3.11..."
+sudo apt-get install -y software-properties-common -qq
+sudo add-apt-repository -y ppa:deadsnakes/ppa -qq
+sudo apt-get update -qq
 sudo apt-get install -y python3.11 python3.11-venv python3-pip git curl -qq
 
 # 3. Install Node.js 20
