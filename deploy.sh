@@ -15,8 +15,9 @@ echo "========================================"
 
 # 1. System updates
 echo ">>> [1/7] Updating system..."
+export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update -qq
-sudo apt-get upgrade -y -qq
+sudo apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -qq
 
 # 2. Install Python 3.11
 echo ">>> [2/7] Installing Python 3.11..."
