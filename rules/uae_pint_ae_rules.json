@@ -1,0 +1,263 @@
+{
+    "fields": [
+        {
+            "field": "specification_id",
+            "rules": ["required", "valid_specification_id"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A1.8: Specification Identifier is mandatory and must follow PINT AE URN."
+        },
+        {
+            "field": "business_process_id",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A1.7: Business Process Type is mandatory."
+        },
+        {
+            "field": "invoice_number",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A1.1: Invoice Number (BR-02) is mandatory."
+        },
+        {
+            "field": "invoice_date",
+            "rules": ["required", "date_format", "not_future"],
+            "severity": "HIGH",
+            "category": "FORMAT",
+            "message": "A1.2: Invoice Date must be YYYY-MM-DD and not in the future."
+        },
+        {
+            "field": "invoice_type_code",
+            "rules": ["required", "valid_type_code"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A1.3: Invoice Type Code must be 380, 381, or 386."
+        },
+        {
+            "field": "currency_code",
+            "rules": ["required", "valid_currency"],
+            "severity": "HIGH",
+            "category": "FORMAT",
+            "message": "A1.4: Currency Code must be valid ISO 4217."
+        },
+        {
+            "field": "payment_means_type_code",
+            "rules": ["required", "valid_payment_code"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A1.9: Payment Means Type Code must be valid."
+        },
+        {
+            "field": "transaction_type_code",
+            "rules": ["required", "valid_binary_flag"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A1.6: Transaction Type Code must be an 8-digit binary flag."
+        },
+        {
+            "field": "seller_name",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A2.1: Seller Legal Name is mandatory."
+        },
+        {
+            "field": "seller_trn",
+            "rules": ["required", "trn_format"],
+            "severity": "HIGH",
+            "category": "FORMAT",
+            "message": "A2.6: Seller TRN must be exactly 15 digits."
+        },
+        {
+            "field": "seller_electronic_address",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A2.2: Seller Electronic Address is mandatory."
+        },
+        {
+            "field": "seller_electronic_scheme",
+            "rules": ["required", "must_be_0235"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A2.3: Seller Electronic Identifier Scheme must be 0235 (UAE TRN)."
+        },
+        {
+            "field": "seller_city",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A2.9: Seller City is mandatory."
+        },
+        {
+            "field": "seller_subdivision",
+            "rules": ["required", "valid_emirate_code"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A2.10: Seller Emirate Code (AZ, AJ, SH, DU, RK, FU, UQ) is mandatory."
+        },
+        {
+            "field": "seller_country_code",
+            "rules": ["required", "must_be_ae"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A2.11: Seller Country Code must be AE."
+        },
+        {
+            "field": "buyer_name",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A3.1: Buyer Legal Name is mandatory."
+        },
+        {
+            "field": "buyer_trn",
+            "rules": ["required_if_b2b", "trn_format"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A3.6: Buyer TRN is required for B2B and must be 15 digits."
+        },
+        {
+            "field": "buyer_electronic_address",
+            "rules": ["required_if_b2b"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A3.2: Buyer Electronic Address is required for B2B."
+        },
+        {
+            "field": "buyer_city",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A3.9: Buyer City is mandatory."
+        },
+        {
+            "field": "buyer_subdivision",
+            "rules": ["required", "valid_emirate_code"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A3.10: Buyer Emirate Code (AZ, AJ, SH, DU, RK, FU, UQ) is mandatory."
+        },
+        {
+            "field": "buyer_country_code",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A3.11: Buyer Country Code is mandatory."
+        },
+        {
+            "field": "tax_category_code",
+            "rules": ["required", "valid_tax_category"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A5.3: Tax Category Code must be S, Z, E, or O."
+        },
+        {
+            "field": "payment_due_date",
+            "rules": ["required", "date_format"],
+            "severity": "HIGH",
+            "category": "FORMAT",
+            "message": "A1.5: Payment Due Date is mandatory."
+        },
+        {
+            "field": "seller_address",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A2.8: Seller Address Line 1 is mandatory."
+        },
+        {
+            "field": "seller_legal_registration",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A2.4: Seller Legal Registration is mandatory."
+        },
+        {
+            "field": "seller_registration_identifier_type",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A2.5: Seller Registration Identifier Type is mandatory."
+        },
+        {
+            "field": "seller_tax_scheme_id",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A2.7: Seller Tax Scheme ID must be VAT."
+        },
+        {
+            "field": "buyer_electronic_scheme",
+            "rules": ["required_if_b2b"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A3.3: Buyer Electronic Identifier Scheme is required for B2B."
+        },
+        {
+            "field": "buyer_legal_registration",
+            "rules": ["required_if_b2b"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A3.4: Buyer Legal Registration is required for B2B."
+        },
+        {
+            "field": "buyer_registration_identifier_type",
+            "rules": ["required_if_b2b"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A3.5: Buyer Registration Identifier Type is required for B2B."
+        },
+        {
+            "field": "buyer_tax_scheme_id",
+            "rules": ["required_if_b2b"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A3.7: Buyer Tax Scheme ID must be VAT for registered buyers."
+        },
+        {
+            "field": "buyer_address",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A3.8: Buyer Address Line 1 is mandatory."
+        },
+        {
+            "field": "line_extension_amount",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A4.1: Line Extension Amount (sum of net amounts) is mandatory."
+        },
+        {
+            "field": "total_without_tax",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A4.2: Total Amount Without Tax is mandatory."
+        },
+        {
+            "field": "tax_amount",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A4.3: Total Tax Amount is mandatory."
+        },
+        {
+            "field": "total_with_tax",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A4.4: Total Amount With Tax is mandatory."
+        },
+        {
+            "field": "amount_due",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A4.5: Amount Due for Payment is mandatory."
+        }
+    ]
+}
