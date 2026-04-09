@@ -28,7 +28,7 @@ sudo apt-get install -y python3.11 python3.11-venv python3-pip git curl -qq
 
 # 3. Install Node.js 20
 echo ">>> [3/7] Installing Node.js 20..."
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - -qq
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs -qq
 echo "Node: $(node --version) | npm: $(npm --version)"
 
