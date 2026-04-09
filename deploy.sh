@@ -56,6 +56,9 @@ cd frontend
 npm install --silent
 npm run build
 cd ..
+rm -rf static
+mkdir -p static
+cp -r frontend/dist/* static/
 echo "Frontend built. Contents of /static:"
 ls -la static/
 

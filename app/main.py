@@ -163,6 +163,12 @@ async def serve_react(full_path: str):
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Not found")
     
+    # 1. Check if the requested path matches a real file in STATIC_DIR (e.g. /logo.png)
+    file_path = os.path.join(STATIC_DIR, full_path.lstrip("/"))
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+
+    # 2. Fallback to index.html for React routing
     index_file = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)
