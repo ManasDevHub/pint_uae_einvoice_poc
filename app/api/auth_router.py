@@ -8,6 +8,7 @@ from app.db.models import User, AuditLog
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from datetime import timedelta, datetime
+from app.core.logging import log
 
 router = APIRouter()
 bearer = HTTPBearer(auto_error=False)
@@ -69,12 +70,15 @@ def _log_audit(db: Session, username: str, action: str, success: bool, request: 
         if request:
             ip = request.headers.get("X-Forwarded-For") or request.headers.get("X-Real-IP") or (request.client.host if request.client else "unknown")
             if "," in ip: ip = ip.split(",")[0].strip() # Handle multiple proxies
+            # Strict truncation for DB safety (max 50 chars as defined in model)
+            ip = ip[:50]
         
         log_entry = AuditLog(username=username, action=action, success=success, ip_address=ip, detail=detail)
         db.add(log_entry)
         db.commit()
-    except Exception:
-        pass  # Never let audit logging break the main flow
+    except Exception as e:
+        log.error(f"Audit log failed for {username}/{action}: {str(e)}")
+        db.rollback() # Ensure session isn't poisoned
 
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):

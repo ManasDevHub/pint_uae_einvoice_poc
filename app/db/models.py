@@ -130,7 +130,7 @@ class User(Base):
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
-    id          = Column(BigInteger, primary_key=True, autoincrement=True)
+    id          = Column(Integer, primary_key=True, autoincrement=True)
     username    = Column(String(100), nullable=False, index=True)
     action      = Column(String(50),  nullable=False)
     success     = Column(Boolean,     nullable=False)
