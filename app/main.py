@@ -79,10 +79,16 @@ async def add_security_headers(request: Request, call_next):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://erasable-contributively-jann.ngrok-free.dev"],
+    allow_origins=[
+        "http://localhost:5173", 
+        "https://erasable-contributively-jann.ngrok-free.dev",
+        "http://52.66.111.65:8000",
+        "http://52.66.111.65"
+    ],
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["X-Request-ID"],
+    allow_credentials=True,
 )
 app.add_middleware(RequestLoggingMiddleware)
 
@@ -95,31 +101,36 @@ VALID_KEYS = {
 @app.middleware("http")
 async def api_key_auth(request: Request, call_next):
     path = request.url.path
+    
+    # Exempt routes that use JWT/Session auth or are public
     exempt_prefixes = {"/assets", "/docs", "/openapi.json", "/health", "/metrics", "/auth"}
     exempt_exact = {"/", "/favicon.svg", "/icons.svg"}
 
     if path in exempt_exact or any(path.startswith(p) for p in exempt_prefixes):
         return await call_next(request)
         
+    # Only enforce X-API-Key for actual integration endpoints
     if not (path.startswith("/api") or path.startswith("/asp")):
         return await call_next(request)
 
     key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
     if not key:
-        return JSONResponse(status_code=401, content={"status": "FAILURE", "message": "X-API-Key header required"})
+        return JSONResponse(
+            status_code=401, 
+            content={"status": "FAILURE", "message": "X-API-Key header required for integration access"}
+        )
     
     hashed = hashlib.sha256(key.encode()).hexdigest()
-    
-    # Timing-safe comparison using secrets.compare_digest
-    is_valid = False
-    tenant_id = None
-    for h_key, t_id in VALID_KEYS.items():
-        if secrets.compare_digest(h_key, hashed):
-            is_valid = True
-            tenant_id = t_id
-            break
+    tenant_id = VALID_KEYS.get(hashed)
 
-    if not is_valid:
+    if not tenant_id:
+        # Fallback to timing-safe if dict lookup fails (optional, dict lookup is O(1))
+        for h_key, t_id in VALID_KEYS.items():
+            if secrets.compare_digest(h_key, hashed):
+                tenant_id = t_id
+                break
+
+    if not tenant_id:
         return JSONResponse(status_code=403, content={"status": "FAILURE", "message": "Invalid API key"})
         
     request.state.tenant_id = tenant_id
@@ -161,7 +172,7 @@ if os.path.exists(STATIC_DIR):
 async def spa_fallback_handler(request: Request, exc):
     path = request.url.path
     # Don't intercept API or docs routes — let them return 404 naturally
-    api_prefixes = ("/api/", "/asp/", "/health/", "/docs", "/openapi.json", "/redoc", "/metrics")
+    api_prefixes = ("/api/", "/asp/", "/health/", "/auth/", "/docs", "/openapi.json", "/redoc", "/metrics")
     if any(path.startswith(p) for p in api_prefixes):
         return JSONResponse(
             status_code=404,
