@@ -109,6 +109,10 @@ export function useInvoiceApi() {
       setIsRunning(false)
       return
     }
+    parsed = data
+  } else {
+    parsed = payload
+  }
 
     // Stage 1: Internal validate
     setStage('validate', 'loading')
