@@ -70,24 +70,25 @@ class DocumentTotals(BaseModel):
     amount_due: float = Field(0.0, alias="amount_due")
 
 class InvoicePayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
     """
     Standard Base JSON payload reflecting the PINT AE Structure.
     """
-    specification_id: str = "urn:peppol:pint:billing-1.0:ae:en:1.0"
-    business_process_id: str = "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0"
-    invoice_number: str = Field(..., min_length=1, max_length=100)
-    invoice_date: str = Field(...)
-    payment_due_date: Optional[str] = None
-    invoice_type_code: str = "380"
-    payment_means_type_code: Optional[str] = "30" # Default to Credit Transfer
-    transaction_type: str = "B2B"
-    transaction_type_code: Optional[str] = "10000000" # UAE 8-digit binary flag
-    currency_code: str = "AED"
-    tax_category_code: str = "S"
-    tax_point_date: Optional[str] = None
-    order_reference: Optional[str] = None
-    payment_terms: Optional[str] = "Standard 30 Days"
-    delivery_date: Optional[str] = None
+    specification_id: str = Field("urn:peppol:pint:billing-1.0:ae:en:1.0", alias="specification_id")
+    business_process_id: str = Field("urn:fdc:peppol.eu:2017:poacc:billing:01:1.0", alias="business_process_id")
+    invoice_number: str = Field(..., min_length=1, max_length=100, alias="invoice_number")
+    invoice_date: str = Field(..., alias="invoice_date")
+    payment_due_date: Optional[str] = Field(None, alias="payment_due_date")
+    invoice_type_code: str = Field("380", alias="invoice_type_code")
+    payment_means_type_code: Optional[str] = Field("30", alias="payment_means_type_code")
+    transaction_type: str = Field("B2B", alias="transaction_type")
+    transaction_type_code: Optional[str] = Field("10000000", alias="transaction_type_code")
+    currency_code: str = Field("AED", alias="currency_code")
+    tax_category_code: str = Field("S", alias="tax_category_code")
+    tax_point_date: Optional[str] = Field(None, alias="tax_point_date")
+    order_reference: Optional[str] = Field(None, alias="order_reference")
+    payment_terms: Optional[str] = Field("Standard 30 Days", alias="payment_terms")
+    delivery_date: Optional[str] = Field(None, alias="delivery_date")
     
     seller: SellerDetails = Field(default_factory=SellerDetails)
     buyer: BuyerDetails = Field(default_factory=BuyerDetails)

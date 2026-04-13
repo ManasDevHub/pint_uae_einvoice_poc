@@ -13,13 +13,13 @@ class InvoiceValidator:
     def validate(self, invoice: InvoicePayload) -> ValidationReport:
         errors = []
         
-        # 1. Rule Engine Evaluation (Presence, Regex, Format)
+        # 1. Rule Engine Evaluation
         flat_data = invoice.extract_flat_data()
         rule_errors = self.rule_engine.evaluate(flat_data)
         errors.extend(rule_errors)
         
-        # PINT AE Total Checks: Guided by the 51 Mandatory Fields
-        total_checks = 51
+        # PINT AE Total Checks: Use the count from the rules engine
+        total_checks = self.rule_engine.rules_loaded
         
         # 2. Mathematical & Business Rule Validation (A4, A5, A6)
         
@@ -123,10 +123,10 @@ class InvoiceValidator:
         high_severity_errors = [e for e in errors if e.severity == "HIGH"]
         is_valid = len(high_severity_errors) == 0
         
-        # 3. Enhanced Metrics
+        # 3. Dynamic Metrics
         failed_checks = len(high_severity_errors)
         passed_checks = max(0, total_checks - failed_checks)
-        pass_percentage = (passed_checks / total_checks) * 100
+        pass_percentage = (passed_checks / total_checks) * 100 if total_checks > 0 else 100.0
         
         metrics = ValidationMetrics(
             total_checks=total_checks,
