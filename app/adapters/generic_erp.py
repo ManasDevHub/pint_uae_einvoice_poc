@@ -29,10 +29,32 @@ class GenericJSONAdapter(BaseERPAdapter):
             if target in base: return base[target]
             
             # Fuzzy match safety: only allow substring matches for non-dictionary return values
-            # to prevent a field like 'city' matching 'seller' and returning the whole object.
+            # AND only if we are searching within a specific sub-dict (src is provided)
+            # OR for a very limited set of common aliases to prevent "transaction_type" matching "transaction_type_code"
             for k, v in base.items():
-                if (target in k or k in target) and not isinstance(v, dict): 
+                # Strictly forbid returning a dict/list when target is likely a leaf value
+                if isinstance(v, (dict, list)):
+                    continue
+                
+                # Only allow exact normalized matches or specific known alias patterns
+                # This prevents 'buyer' from matching 'buyer_trn'
+                if k == target:
                     return v
+
+                # Fallback purely for very common simple aliases (Excel column headers)
+                aliases = {
+                    "invoiceno": ["invoice_number", "bill_number"],
+                    "billno": ["invoice_number"],
+                    "subtotal": ["total_without_tax"],
+                    "qty": ["quantity"],
+                    "rate": ["tax_rate"]
+                }
+                
+                # Check if k is an alias for target
+                for clean_k, list_aliases in aliases.items():
+                    if target in list_aliases and k == clean_k:
+                        return v
+
             return default
 
         # Numeric cleanup helpers
