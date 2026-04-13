@@ -91,12 +91,6 @@ class RuleEngine:
                         has_error_for_field = True
                         
                 elif rule == "trn_format" and not is_empty:
-                    # Only enforce TRN format for B2B or if explicitly provided for B2C
-                    # For B2C, we skip format check if the field contains junk dictionary strings from mapping
-                    is_b2b = data.get("is_b2b") is True
-                    if not is_b2b and (str(val).startswith("{") or "consumer" in str(val).lower()):
-                        continue # Skip junk for B2C
-                        
                     if not re.match(r"^[0-9]{15}$", str(val)):
                         errors.append(ValidationErrorItem(field=field, error=message, severity=severity, category=category))
                         has_error_for_field = True
@@ -129,11 +123,6 @@ class RuleEngine:
                 
                 elif rule == "email_format" and not is_empty:
                     # Basic email regex
-                    is_b2b = data.get("is_b2b") is True
-                    # Skip email format check for B2C if it contains junk strings (e.g. dict representations)
-                    if not is_b2b and (str(val).startswith("{") or "consumer" in str(val).lower()):
-                        continue
-
                     email_regex = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
                     if not re.match(email_regex, str(val)):
                         errors.append(ValidationErrorItem(field=field, error=message, severity=severity, category=category))
