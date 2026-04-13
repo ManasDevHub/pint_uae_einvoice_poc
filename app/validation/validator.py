@@ -226,4 +226,3 @@ class InvoiceValidator:
                 fr('item_name',        'Item name',           invoice.lines[0].item_name if invoice.lines else '—',        'A6.12'),
             ]),
         ]
-]
