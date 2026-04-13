@@ -1,12 +1,18 @@
-from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File, Request, Depends
 from fastapi.responses import StreamingResponse
 from typing import List, Dict, Any
 from uuid import uuid4
 import asyncio
 import json
+import io
+import logging
 from app.core.config import settings
+from app.db.session import get_db, SessionLocal
+from app.etl.tasks.extract import extract_excel
+from app.etl.tasks.transform import transform_batch
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
 import redis
 try:
@@ -117,56 +123,123 @@ def map_excel_to_pint_ae(df) -> List[Dict]:
     return [r for r in records if any(str(v).strip() != "" for v in r.values())]
 
 @router.post("/ingest-bulk")
-@router.post("/upload-bulk")   # Alias
-@router.post("/upload-excel")  # Alias
+@router.post("/upload-bulk")
+@router.post("/upload-excel")
 async def upload_bulk(request: Request, background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    from app.main import limiter
-    
     filename = file.filename.lower()
     if not any(filename.endswith(ext) for ext in ['.xlsx', '.xls', '.csv', '.xml', '.zip']):
-        raise HTTPException(400, "Unsupported file format. Use Excel, CSV, XML, or Zip of XMLs.")
-    
+        raise HTTPException(400, "Unsupported file format. Use Excel, CSV, XML, or ZIP of XMLs.")
+
     contents = await file.read()
-    batch_id = f"BATCH-{str(uuid4().hex[:8]).upper()}"
-    
-    import pandas as pd
-    import io
-    import zipfile
-    
-    payloads = []
+    tenant_id = getattr(request.state, "tenant_id", "anonymous")
+
+    import io, uuid, json
+    from app.db.session import SessionLocal
+    from app.db.models import ETLJob
+
+    batch_id = f"BATCH-{uuid.uuid4().hex[:8].upper()}"
+
+    # Create ETL job record in PostgreSQL
+    db = SessionLocal()
     try:
-        if filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(contents), dtype=str)
-            payloads = map_excel_to_pint_ae(df)
-        elif filename.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(io.BytesIO(contents), dtype=str)
-            payloads = map_excel_to_pint_ae(df)
-        elif filename.endswith('.xml'):
-            # Single XML file
-            payloads = [contents]
-        elif filename.endswith('.zip'):
-            # Zip of XML files
-            with zipfile.ZipFile(io.BytesIO(contents)) as z:
-                for zinfo in z.infolist():
-                    if zinfo.filename.lower().endswith('.xml'):
-                        with z.open(zinfo.filename) as f:
-                            payloads.append(f.read())
-            if not payloads:
-                raise ValueError("No XML files found in Zip")
-    except Exception as e:
-        raise HTTPException(400, f"Error processing file: {str(e)}")
-    
-    if len(payloads) > settings.max_batch_size:
-        raise HTTPException(status_code=400, detail=f"File contains {len(payloads)} invoices, which exceeds the limit of {settings.max_batch_size}")
-    
-    initial_data = {"status": "PROCESSING", "total": len(payloads), "done": 0}
+        etl_job = ETLJob(
+            batch_id=batch_id,
+            tenant_id=tenant_id,
+            job_type="bulk_excel",
+            source_filename=file.filename,
+            source_format=filename.split(".")[-1],
+            status="QUEUED",
+            total_rows=0,
+        )
+        db.add(etl_job)
+        db.commit()
+        db.refresh(etl_job)
+        job_id = etl_job.id
+    finally:
+        db.close()
+
+    # Route to appropriate ETL task
+    if filename.endswith(('.xlsx', '.xls', '.csv')):
+        try:
+            extract_excel(job_id, contents.hex(), file.filename, tenant_id=tenant_id)
+            log.info(f"ETL Background Job COMPLETED synchronously: job={job_id}")
+        except Exception as e:
+            log.error(f"ETL Direct Call failed: {e}")
+
+    elif filename.endswith('.xml'):
+        # Single XML — treat as single-item batch
+        try:
+            transform_batch(job_id, [contents.hex()], tenant_id=tenant_id)
+        except Exception as e:
+            log.error(f"ETL XML Transform Call failed: {e}")
+
+    elif filename.endswith('.zip'):
+        import zipfile
+        xml_payloads = []
+        with zipfile.ZipFile(io.BytesIO(contents)) as z:
+            for zinfo in z.infolist():
+                if zinfo.filename.lower().endswith('.xml'):
+                    with z.open(zinfo.filename) as f:
+                        xml_payloads.append(f.read().hex())
+        if not xml_payloads:
+            raise HTTPException(400, "No XML files found in ZIP")
+        
+        try:
+            transform_batch(job_id, xml_payloads, tenant_id=tenant_id)
+        except Exception as e:
+            log.error(f"ETL ZIP Transform Call failed: {e}")
+
+    # Also update Redis for backward compat with old polling
+    initial_data = {"status": "PROCESSING", "total": 0, "done": 0, "batch_id": batch_id}
     if redis_client:
         redis_client.setex(f"batch:{batch_id}", 3600, json.dumps(initial_data))
-    else:
-        batch_results[batch_id] = initial_data
-        
-    background_tasks.add_task(_process_batch, batch_id, payloads)
-    return {"batch_id": batch_id, "total_rows": len(payloads), "status": "PROCESSING"}
+
+    return {
+        "batch_id": batch_id,
+        "job_id": job_id,
+        "status": "QUEUED",
+        "total_rows": 0,
+        "poll_url": f"/api/v1/batch-status/{batch_id}",
+        "etl_job_url": f"/api/v1/etl-jobs/{job_id}",
+    }
+
+@router.get("/etl-jobs/{job_id}")
+async def get_etl_job(job_id: str, request: Request, db: SessionLocal = Depends(get_db)):
+    from app.db.models import ETLJob
+    job = db.query(ETLJob).filter(ETLJob.id == job_id).first()
+    if not job:
+        raise HTTPException(404, "ETL job not found")
+    return {
+        "id": job.id,
+        "batch_id": job.batch_id,
+        "status": job.status,
+        "source_filename": job.source_filename,
+        "total_rows": job.total_rows,
+        "processed_rows": job.processed_rows,
+        "valid_rows": job.valid_rows,
+        "invalid_rows": job.invalid_rows,
+        "failed_rows": job.failed_rows,
+        "progress_pct": round(job.processed_rows / job.total_rows * 100, 1) if job.total_rows else 0,
+        "duration_ms": job.duration_ms,
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+        "created_at": job.created_at,
+        "error_message": job.error_message,
+    }
+
+@router.get("/etl-jobs")
+async def list_etl_jobs(request: Request, db: SessionLocal = Depends(get_db),
+                         skip: int = 0, limit: int = 20):
+    from app.db.models import ETLJob
+    from sqlalchemy import desc
+    tenant_id = getattr(request.state, "tenant_id", "anonymous")
+    jobs = db.query(ETLJob).filter(ETLJob.tenant_id == tenant_id)\
+             .order_by(desc(ETLJob.created_at)).offset(skip).limit(limit).all()
+    return [{"id": j.id, "batch_id": j.batch_id, "status": j.status,
+             "source_filename": j.source_filename, "total_rows": j.total_rows,
+             "valid_rows": j.valid_rows, "invalid_rows": j.invalid_rows,
+             "progress_pct": round(j.processed_rows/j.total_rows*100,1) if j.total_rows else 0,
+             "created_at": j.created_at} for j in jobs]
 
 @router.get("/download-template")
 async def download_template():
@@ -317,13 +390,51 @@ async def download_template():
         headers={"Content-Disposition": "attachment; filename=PINT_AE_Bulk_Template.xlsx"}
     )
 
+from sqlalchemy.orm import Session
 @router.get("/batch-status/{batch_id}")
-async def batch_status(request: Request, batch_id: str):
+async def batch_status(request: Request, batch_id: str, db: Session = Depends(get_db)):
     if redis_client:
         data = redis_client.get(f"batch:{batch_id}")
         if data:
             return json.loads(data)
     elif batch_id in batch_results:
         return batch_results[batch_id]
+        
+    # FALLBACK: Check PostgreSQL/SQLite Database
+    from app.db.models import ETLJob, ValidationRun, ETLRowError
+    job = db.query(ETLJob).filter(ETLJob.batch_id == batch_id).first()
+    if job:
+        results = []
+        # Get successful validations
+        runs = db.query(ValidationRun).filter(ValidationRun.etl_job_id == job.id).order_by(ValidationRun.invoice_number).all()
+        for r in runs:
+            results.append({
+                "invoice_number": r.invoice_number,
+                "is_valid": r.is_valid,
+                "errors": r.errors_json or [],
+                "warnings": [],
+                "row_number": getattr(r, "row_number", None)
+            })
+            
+        # Get row errors (from transform/extract phase)
+        row_errors = db.query(ETLRowError).filter(ETLRowError.etl_job_id == job.id).all()
+        for re in row_errors:
+            results.append({
+                "invoice_number": re.invoice_number or f"Row {re.row_number}",
+                "is_valid": False,
+                "errors": [{"field": re.error_type, "error": re.error_message}],
+                "warnings": [],
+                "row_number": re.row_number
+            })
+
+        return {
+            "status": job.status,
+            "total": job.total_rows,
+            "done": job.processed_rows + job.failed_rows,
+            "batch_id": job.batch_id,
+            "job_id": job.id,
+            "results": results,
+            "error_message": job.error_message,
+        }
         
     raise HTTPException(status_code=404, detail="Batch not found")

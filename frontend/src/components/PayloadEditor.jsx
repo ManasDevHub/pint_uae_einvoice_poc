@@ -112,8 +112,8 @@ export default function PayloadEditor({ value, onChange, apiKey, onApiKeyChange,
                 className={`w-full h-[22px] flex items-center ${err ? 'bg-red-500/10 border-l-2 border-red-500' : ''}`}
               >
                 {err && (
-                  <div className="ml-auto flex items-center pr-2">
-                     <span className="text-[9px] font-bold text-red-500 px-1 bg-white border border-red-200 rounded uppercase tracking-tighter mr-6">
+                  <div className="ml-auto flex items-center pr-2 max-w-[40%] overflow-hidden">
+                     <span className="text-[9px] font-bold text-red-500 px-1 bg-white border border-red-200 rounded uppercase tracking-tighter mr-6 truncate">
                        {err.field} Fail
                      </span>
                   </div>

@@ -53,7 +53,7 @@ export default function Validate() {
         <p className="text-sm text-[#5a6a85] mt-1">UAE PINT AE · 51 mandatory field coverage · ERP adapter layer</p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_300px] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px] gap-6 items-start">
         
         {/* Left: Editor */}
         <div className="bg-white border border-[#e3eaf7] rounded-xl p-5 shadow-sm min-h-[600px] flex flex-col h-full overflow-hidden">

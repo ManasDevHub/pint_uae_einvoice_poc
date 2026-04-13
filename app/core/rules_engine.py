@@ -120,5 +120,23 @@ class RuleEngine:
                     if str(val) != "0235":
                         errors.append(ValidationErrorItem(field=field, error=message, severity=severity, category=category))
                         has_error_for_field = True
+                
+                elif rule == "email_format" and not is_empty:
+                    # Basic email regex
+                    email_regex = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+                    if not re.match(email_regex, str(val)):
+                        errors.append(ValidationErrorItem(field=field, error=message, severity=severity, category=category))
+                        has_error_for_field = True
+
+                elif rule == "valid_transaction_type" and not is_empty:
+                    if str(val).upper() not in ["B2B", "B2C"]:
+                        errors.append(ValidationErrorItem(field=field, error=message, severity=severity, category=category))
+                        has_error_for_field = True
+
+                elif rule == "valid_invoice_number" and not is_empty:
+                    # Alphanumeric with some symbols / - and SPACE
+                    if not re.match(r"^[a-zA-Z0-9\-/ ]+$", str(val)):
+                        errors.append(ValidationErrorItem(field=field, error=message, severity=severity, category=category))
+                        has_error_for_field = True
 
         return errors

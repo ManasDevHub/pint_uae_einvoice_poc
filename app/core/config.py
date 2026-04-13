@@ -14,7 +14,17 @@ class Settings(BaseSettings):
     duplicate_cache_ttl: int = 86400
     log_level: str = "INFO"
     enable_metrics: bool = True
+    celery_task_always_eager: bool = False
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    # -- Database Credentials (Postgres) --
+    postgres_user: str = "einvoicedev"
+    postgres_password: str = "uae_inv_2026_secure"
+    postgres_db: str = "uae_einvoice"
+
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
 settings = Settings()

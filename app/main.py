@@ -68,7 +68,13 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:8000 https://*.ngrok-free.dev;"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data: https://fastapi.tiangolo.com; "
+        "connect-src 'self' http://localhost:8000 https://*.ngrok-free.dev;"
+    )
     return response
 
 app.add_middleware(
@@ -141,37 +147,35 @@ app.include_router(mock_router, prefix="/asp/v1", tags=["ASP Mock Simulation"])
 # ── Serve React build ──
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
 
-@app.get("/health/live")
-async def health_live():
-    return {"status": "ok"}
-
-@app.get("/health/ready")  
-async def health_ready():
-    return {"status": "ok"}
-
 # Serve static assets (JS, CSS, images)
 if os.path.exists(STATIC_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
 
-# Catch-all route — serves index.html for every non-API path
+# SPA Fallback: Serve index.html for 404s on non-API routes
 # This fixes React Router (reload on /validate, /history etc works)
-@app.get("/{full_path:path}", include_in_schema=False)
-async def serve_react(full_path: str):
-    # Don't intercept API or docs routes
-    api_prefixes = ("api/", "asp/", "health/", "docs", "openapi.json", "redoc")
-    if any(full_path.startswith(p) for p in api_prefixes):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Not found")
+# and prevents interference with /docs, /openapi.json etc.
+@app.exception_handler(404)
+async def spa_fallback_handler(request: Request, exc):
+    path = request.url.path
+    # Don't intercept API or docs routes — let them return 404 naturally
+    api_prefixes = ("/api/", "/asp/", "/health/", "/docs", "/openapi.json", "/redoc", "/metrics")
+    if any(path.startswith(p) for p in api_prefixes):
+        return JSONResponse(
+            status_code=404,
+            content={"detail": "Not Found", "path": path}
+        )
     
-    # 1. Check if the requested path matches a real file in STATIC_DIR (e.g. /logo.png)
-    file_path = os.path.join(STATIC_DIR, full_path.lstrip("/"))
+    # Check for static file first (e.g. /favicon.ico)
+    file_path = os.path.join(STATIC_DIR, path.lstrip("/"))
     if os.path.isfile(file_path):
         return FileResponse(file_path)
 
-    # 2. Fallback to index.html for React routing
+    # Fallback to index.html for React routing
     index_file = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)
     
-    # Fallback if the frontend build isn't ready
-    return {"message": "UAE PINT AE Engine", "docs": "/docs"}
+    return JSONResponse(
+        status_code=404,
+        content={"message": "UAE PINT AE Engine - Startup in progress or Frontend not built", "docs": "/docs"}
+    )

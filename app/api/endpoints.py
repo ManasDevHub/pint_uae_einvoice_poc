@@ -13,7 +13,7 @@ from app.db.session import get_db
 from app.db.models import ValidationRun
 from app.core.config import settings
 
-# Prometheus metrics
+from app.core.logging import log
 from prometheus_client import Counter, Histogram
 INVOICES_VALIDATED = Counter("invoices_validated_total", "Total invoices", ["tenant_id", "transaction_type", "result"])
 VALIDATION_DURATION = Histogram("validation_duration_seconds", "Validation duration")
@@ -56,13 +56,19 @@ def validate_invoice(request: Request, raw_payload: Dict[str, Any], db: Session 
     
     # 1. Duplicate check (Rule 8)
     fingerprint = invoice_fingerprint(raw_payload)
-    if redis_client:
+    no_cache = request.query_params.get("nocache", "false").lower() == "true"
+    
+    if redis_client and not no_cache:
         cached = redis_client.get(f"invoice:{fingerprint}")
         if cached:
+            log.info(f"Cache hit for invoice {fingerprint}")
             return json.loads(cached)
 
     try:
         adapter = get_adapter()
+        # Log absolute path of rules for production debugging
+        from app.validation.validator import DEFAULT_RULES_PATH
+        log.info(f"Validating invoice {raw_payload.get('invoice_number')} using rules at {DEFAULT_RULES_PATH}")
         # Input Sanitization (Rule 20)
         def sanitize_string(value: Any) -> Any:
             if not isinstance(value, str): return value
@@ -104,25 +110,34 @@ def validate_invoice(request: Request, raw_payload: Dict[str, Any], db: Session 
             
         # 4. Persistence DB Audit Log (Rule 7)
         elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
-        run = ValidationRun(
-            tenant_id=tenant_id,
-            invoice_number=report.invoice_number,
-            invoice_date=invoice.invoice_date,
-            transaction_type=invoice.transaction_type,
-            invoice_type_code=invoice.invoice_type_code,
-            is_valid=report.is_valid,
-            total_errors=report.total_errors,
-            pass_percentage=report.metrics.pass_percentage,
-            errors_json=[e.model_dump() for e in report.errors],
-            raw_payload=raw_payload,
-            duration_ms=elapsed_ms
-        )
-        db.add(run)
-        db.commit()
+        try:
+            log.info(f"Persisting validation result for {report.invoice_number}")
+            run = ValidationRun(
+                tenant_id=tenant_id,
+                invoice_number=report.invoice_number,
+                invoice_date=invoice.invoice_date,
+                transaction_type=invoice.transaction_type,
+                invoice_type_code=invoice.invoice_type_code,
+                is_valid=report.is_valid,
+                total_errors=report.total_errors,
+                pass_percentage=report.metrics.pass_percentage,
+                errors_json=[e.model_dump() for e in report.errors],
+                raw_payload=raw_payload,
+                duration_ms=elapsed_ms
+            )
+            db.add(run)
+            db.commit()
+            log.info(f"Audit log committed for {report.invoice_number}")
+        except Exception as db_err:
+            db.rollback()
+            log.error(f"Failed to commit audit log for {report.invoice_number}: {db_err}")
+            # We do NOT raise an error here because the validation result itself is valid
+            # and MUST be returned to the user for the demo.
         
         return response_data
     except pydantic.ValidationError as e:
         from app.validation.helpers import build_report_from_error
+        log.warning(f"Schema validation failed for payload: {str(e)}")
         report = build_report_from_error(e, invoice_number=raw_payload.get("invoice_number", "Unknown"))
         
         return APIResponse(
@@ -133,4 +148,5 @@ def validate_invoice(request: Request, raw_payload: Dict[str, Any], db: Session 
     except Exception as e:
         import traceback
         traceback.print_exc()
+        log.error(f"Critical error in validate_invoice: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal Validation Error: {str(e)}")

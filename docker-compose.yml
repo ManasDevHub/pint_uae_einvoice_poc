@@ -1,0 +1,54 @@
+# docker-compose.yml
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: uae_postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  celery_worker:
+    build: .
+    command: celery -A app.etl.celery_app worker --loglevel=info -Q default,validation,load -c 1
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql://einvoicedev:uae_inv_2026_secure@db:5432/uae_einvoice
+      - REDIS_URL=redis://redis:6379/0
+      - API_KEYS=${API_KEYS:-demo-key-123}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  celery_flower:
+    build: .
+    command: celery -A app.etl.celery_app flower --port=5555
+    ports: ["5555:5555"]
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+volumes:
+  postgres_data:
+  pgdata:

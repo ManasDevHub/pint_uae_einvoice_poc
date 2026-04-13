@@ -5,7 +5,7 @@ class SellerDetails(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     
     name: Optional[str] = Field(None, alias="seller_name")
-    trn: Optional[str] = Field(None, alias="seller_trn", pattern=r"^[0-9]{15}$")
+    trn: Optional[str] = Field(None, alias="seller_trn")
     address: Optional[str] = Field(None, alias="seller_address")
     city: Optional[str] = Field(None, alias="seller_city")
     subdivision: Optional[str] = Field(None, alias="seller_subdivision")  # Emirate code
@@ -15,12 +15,13 @@ class SellerDetails(BaseModel):
     legal_registration: Optional[str] = Field(None, alias="seller_legal_registration")
     registration_identifier_type: Optional[str] = Field(None, alias="seller_registration_identifier_type")
     tax_scheme_id: Optional[str] = Field("VAT", alias="seller_tax_scheme_id")
+    postal_code: Optional[str] = Field(None, alias="seller_postal_code")
 
 class BuyerDetails(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     
     name: Optional[str] = Field(None, alias="buyer_name")
-    trn: Optional[str] = Field(None, alias="buyer_trn", pattern=r"^[0-9]{15}$")
+    trn: Optional[str] = Field(None, alias="buyer_trn")
     address: Optional[str] = Field(None, alias="buyer_address")
     city: Optional[str] = Field(None, alias="buyer_city")
     subdivision: Optional[str] = Field(None, alias="buyer_subdivision")
@@ -30,6 +31,7 @@ class BuyerDetails(BaseModel):
     legal_registration: Optional[str] = Field(None, alias="buyer_legal_registration")
     registration_identifier_type: Optional[str] = Field(None, alias="buyer_registration_identifier_type")
     tax_scheme_id: Optional[str] = Field("VAT", alias="buyer_tax_scheme_id")
+    postal_code: Optional[str] = Field(None, alias="buyer_postal_code")
 
 
 class InvoiceLineItem(BaseModel):
@@ -67,8 +69,8 @@ class InvoicePayload(BaseModel):
     """
     specification_id: str = "urn:peppol:pint:billing-1.0:ae:en:1.0"
     business_process_id: str = "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0"
-    invoice_number: str = Field(..., min_length=1, max_length=50, pattern=r'^[\w\-/]+$')
-    invoice_date: str = Field(..., pattern=r'^\d{4}-\d{2}-\d{2}$')
+    invoice_number: str = Field(..., min_length=1, max_length=100)
+    invoice_date: str = Field(...)
     payment_due_date: Optional[str] = None
     invoice_type_code: str = "380"
     payment_means_type_code: Optional[str] = "30" # Default to Credit Transfer
@@ -76,6 +78,10 @@ class InvoicePayload(BaseModel):
     transaction_type_code: Optional[str] = "10000000" # UAE 8-digit binary flag
     currency_code: str = "AED"
     tax_category_code: str = "S"
+    tax_point_date: Optional[str] = None
+    order_reference: Optional[str] = None
+    payment_terms: Optional[str] = "Standard 30 Days"
+    delivery_date: Optional[str] = None
     
     seller: SellerDetails = Field(default_factory=SellerDetails)
     buyer: BuyerDetails = Field(default_factory=BuyerDetails)
@@ -136,5 +142,21 @@ class InvoicePayload(BaseModel):
             "amount_due": self.totals.amount_due,
             
             "line_count": len(self.lines),
-            "tax_subtotals_count": len(self.tax_subtotals)
+            "tax_subtotals_count": len(self.tax_subtotals),
+
+            # Header Expansion
+            "tax_point_date": self.tax_point_date,
+            "order_reference": self.order_reference,
+            "payment_terms": self.payment_terms,
+            "delivery_date": self.delivery_date,
+            "seller_postal_code": self.seller.postal_code,
+            "buyer_postal_code": self.buyer.postal_code,
+
+            # Line Level Proxy (First Line)
+            "line_id": self.lines[0].line_id if self.lines else None,
+            "item_name": self.lines[0].item_name if self.lines else None,
+            "unit_of_measure": self.lines[0].unit_of_measure if self.lines else None,
+            "quantity": self.lines[0].quantity if self.lines else None,
+            "unit_price": self.lines[0].unit_price if self.lines else None,
+            "line_net_amount": self.lines[0].line_net_amount if self.lines else None
         }

@@ -16,10 +16,10 @@
         },
         {
             "field": "invoice_number",
-            "rules": ["required"],
+            "rules": ["required", "valid_invoice_number"],
             "severity": "HIGH",
             "category": "COMPLIANCE",
-            "message": "A1.1: Invoice Number (BR-02) is mandatory."
+            "message": "A1.1: Invoice Number (BR-02) is mandatory and must be alphanumeric."
         },
         {
             "field": "invoice_date",
@@ -57,6 +57,13 @@
             "message": "A1.6: Transaction Type Code must be an 8-digit binary flag."
         },
         {
+            "field": "transaction_type",
+            "rules": ["required", "valid_transaction_type"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A1.10: Transaction Type must be 'B2B' or 'B2C'."
+        },
+        {
             "field": "seller_name",
             "rules": ["required"],
             "severity": "HIGH",
@@ -72,10 +79,10 @@
         },
         {
             "field": "seller_electronic_address",
-            "rules": ["required"],
+            "rules": ["required", "email_format"],
             "severity": "HIGH",
-            "category": "COMPLIANCE",
-            "message": "A2.2: Seller Electronic Address is mandatory."
+            "category": "FORMAT",
+            "message": "A2.2: Seller Electronic Address is mandatory and must be a valid email."
         },
         {
             "field": "seller_electronic_scheme",
@@ -121,10 +128,10 @@
         },
         {
             "field": "buyer_electronic_address",
-            "rules": ["required_if_b2b"],
+            "rules": ["required_if_b2b", "email_format"],
             "severity": "HIGH",
-            "category": "COMPLIANCE",
-            "message": "A3.2: Buyer Electronic Address is required for B2B."
+            "category": "FORMAT",
+            "message": "A3.2: Buyer Electronic Address is required for B2B and must be a valid email."
         },
         {
             "field": "buyer_city",
@@ -258,6 +265,90 @@
             "severity": "HIGH",
             "category": "COMPLIANCE",
             "message": "A4.5: Amount Due for Payment is mandatory."
+        },
+        {
+            "field": "line_id",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A6.1: Invoice Line Identifier is mandatory."
+        },
+        {
+            "field": "item_name",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A6.2: Item Name is mandatory."
+        },
+        {
+            "field": "unit_of_measure",
+            "rules": ["required", "valid_uom"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A6.3: Unit of Measure is mandatory and must be valid UN/ECE Rec 20."
+        },
+        {
+            "field": "quantity",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A6.4: Invoiced Quantity is mandatory."
+        },
+        {
+            "field": "unit_price",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A6.5: Item Net Price is mandatory."
+        },
+        {
+            "field": "line_net_amount",
+            "rules": ["required"],
+            "severity": "HIGH",
+            "category": "COMPLIANCE",
+            "message": "A6.6: Line Extension Amount is mandatory."
+        },
+        {
+            "field": "tax_point_date",
+            "rules": ["date_format"],
+            "severity": "MEDIUM",
+            "category": "FORMAT",
+            "message": "A1.6: Tax Point Date must follow YYYY-MM-DD if provided."
+        },
+        {
+            "field": "order_reference",
+            "rules": ["required_if_b2b"],
+            "severity": "MEDIUM",
+            "category": "COMPLIANCE",
+            "message": "A1.12: Order Reference is recommended for B2B transactions."
+        },
+        {
+            "field": "payment_terms",
+            "rules": ["required"],
+            "severity": "MEDIUM",
+            "category": "COMPLIANCE",
+            "message": "A1.11: Payment Terms description is mandatory."
+        },
+        {
+            "field": "seller_postal_code",
+            "rules": ["required"],
+            "severity": "LOW",
+            "category": "COMPLIANCE",
+            "message": "A2.12: Seller Postal Code is mandatory if applicable."
+        },
+        {
+            "field": "buyer_postal_code",
+            "rules": ["required_if_b2b"],
+            "severity": "LOW",
+            "category": "COMPLIANCE",
+            "message": "A3.12: Buyer Postal Code is mandatory for B2B if applicable."
+        },
+        {
+            "field": "delivery_date",
+            "rules": ["date_format"],
+            "severity": "MEDIUM",
+            "category": "FORMAT",
+            "message": "A7.1: Delivery Date must follow YYYY-MM-DD if provided."
         }
     ]
 }

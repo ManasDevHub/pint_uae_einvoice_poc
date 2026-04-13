@@ -6,12 +6,13 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
+    host: '0.0.0.0',
     allowedHosts: true,
     proxy: {
-      '/api': 'http://localhost:8000',
-      '/asp': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
-      '/auth': 'http://localhost:8000',
+      '/api': process.env.VITE_API_HOST || 'http://localhost:8000',
+      '/asp': process.env.VITE_API_HOST || 'http://localhost:8000',
+      '/health': process.env.VITE_API_HOST || 'http://localhost:8000',
+      '/auth': process.env.VITE_API_HOST || 'http://localhost:8000',
     }
   },
   build: {
