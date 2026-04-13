@@ -160,12 +160,14 @@ async def upload_bulk(request: Request, background_tasks: BackgroundTasks, file:
         import zipfile
         xml_payloads = []
         with zipfile.ZipFile(io.BytesIO(contents)) as z:
-            for zinfo in z.infolist():
-                if zinfo.filename.lower().endswith('.xml'):
-                    with z.open(zinfo.filename) as f:
-                        xml_payloads.append(f.read())
+            # Sort to maintain some order and limit to max_batch_size
+            xml_files = [f for f in z.infolist() if f.filename.lower().endswith('.xml')][:settings.max_batch_size]
+            for zinfo in xml_files:
+                with z.open(zinfo.filename) as f:
+                    xml_payloads.append(f.read())
+        
         if not xml_payloads:
-            raise HTTPException(400, "No XML files found in ZIP")
+            raise HTTPException(400, "No XML files found in ZIP (or all ignored due to batch limit)")
         background_tasks.add_task(_process_batch, batch_id, xml_payloads)
 
     # Return poll URL for backward compat with UI

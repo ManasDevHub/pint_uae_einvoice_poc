@@ -129,19 +129,28 @@ class GenericJSONAdapter(BaseERPAdapter):
             price = safe_float(get_val("unit_price", get_val("price", 0)))
             
             if item or qty > 0 or price > 0:
-                rate = safe_float(get_val("tax_rate", 0.05))
+                rate = safe_float(get_val("tax_rate", get_val("line_tax_rate", 0.05)))
                 if rate > 1: rate = rate / 100 
                 net_amount = safe_float(get_val("line_net_amount", get_val("net_amount", qty * price)))
-                tax_amount = safe_float(get_val("tax_amount", net_amount * rate))
+                tax_amount = safe_float(get_val("tax_amount", get_val("line_tax_amount", net_amount * rate)))
+                
+                # A6 Mandatory Fields
                 lines.append({
                     "line_id": str(get_val("line_id", "1")),
                     "item_name": item if item else "Consulting Services",
+                    "item_description": str(get_val("item_description", get_val("description", item))),
+                    "unit_of_measure": str(get_val("unit_of_measure", get_val("uom", "EA"))),
                     "quantity": qty if qty > 0 else 1.0,
                     "unit_price": price,
+                    "gross_price": safe_float(get_val("gross_price", get_val("item_gross_price", price))),
+                    "price_base_quantity": safe_float(get_val("price_base_quantity", 1.0)),
+                    "discount_amount": safe_float(get_val("discount_amount", 0.0)),
                     "line_net_amount": net_amount,
-                    "tax_category": str(get_val("tax_category", "S")),
+                    "tax_category": str(get_val("tax_category", get_val("line_tax_category", "S"))),
                     "tax_rate": rate,
-                    "tax_amount": tax_amount
+                    "tax_amount": tax_amount,
+                    "vat_line_amount_aed": safe_float(get_val("vat_line_amount_aed", tax_amount)),
+                    "line_amount_aed": safe_float(get_val("line_amount_aed", net_amount))
                 })
         
         norm_data["lines"] = lines

@@ -152,11 +152,23 @@ class InvoicePayload(BaseModel):
             "seller_postal_code": self.seller.postal_code,
             "buyer_postal_code": self.buyer.postal_code,
 
-            # Line Level Proxy (First Line)
+            # Tax Breakdown Expansion (A5) - First entry proxy for presence/format rules
+            "tax_subtotal_taxable_amount": self.tax_subtotals[0].taxable_amount if self.tax_subtotals else None,
+            "tax_subtotal_tax_amount": self.tax_subtotals[0].tax_amount if self.tax_subtotals else None,
+            "tax_category_rate": self.tax_subtotals[0].tax_rate if self.tax_subtotals else None,
+
+            # Line Level Proxy (First Line) - A6
             "line_id": self.lines[0].line_id if self.lines else None,
             "item_name": self.lines[0].item_name if self.lines else None,
+            "item_description": self.lines[0].item_description if self.lines else None,
             "unit_of_measure": self.lines[0].unit_of_measure if self.lines else None,
             "quantity": self.lines[0].quantity if self.lines else None,
             "unit_price": self.lines[0].unit_price if self.lines else None,
-            "line_net_amount": self.lines[0].line_net_amount if self.lines else None
+            "gross_price": self.lines[0].gross_price if self.lines else None,
+            "price_base_quantity": self.lines[0].price_base_quantity if self.lines else None,
+            "line_net_amount": self.lines[0].line_net_amount if self.lines else None,
+            "line_tax_category": self.lines[0].tax_category if self.lines else None,
+            "line_tax_rate": self.lines[0].tax_rate if self.lines else None,
+            "vat_line_amount_aed": self.lines[0].aed_tax_amount if self.lines else None,
+            "line_amount_aed": self.lines[0].line_net_amount if self.lines else None,
         }

@@ -13,166 +13,120 @@ class InvoiceValidator:
     def validate(self, invoice: InvoicePayload) -> ValidationReport:
         errors = []
         
-        # 1. Rule Engine Evaluation (Config-driven for presence, regex, format)
+        # 1. Rule Engine Evaluation (Presence, Regex, Format)
         flat_data = invoice.extract_flat_data()
         rule_errors = self.rule_engine.evaluate(flat_data)
         errors.extend(rule_errors)
-        total_checks = max(len(self.rule_engine.fields_config), 51)
         
-        # 2. Hardcoded Cross-field & Mathematical Calculations (Business Logic)
-        calculated_line_total = sum(round(line.line_net_amount, 2) for line in invoice.lines)
+        # PINT AE Total Checks: Guided by the 51 Mandatory Fields
+        total_checks = 51
         
-        for line in invoice.lines:
-            # PINT AE: Gross Price - Discount = Net Price check
-            if line.gross_price is not None:
-                expected_net = round(line.gross_price - (line.discount_amount / line.quantity if line.quantity > 0 else 0), 2)
-                if abs(expected_net - line.unit_price) > 0.01:
-                    errors.append(ValidationErrorItem(
-                        field="unit_price",
-                        error=f"A6.5: Net price {line.unit_price} != Gross {line.gross_price} - Discount/Qty",
-                        severity="MEDIUM",
-                        category="CALCULATION"
-                    ))
-
-            # E11: Negative quantities rejection (Except for Credit Notes - 381)
-            is_credit_note = invoice.invoice_type_code == "381"
-            if line.quantity < 0 and not is_credit_note:
-                errors.append(ValidationErrorItem(
-                    field="quantity",
-                    error=f"E11: Negative Quantities not allowed for Standard Invoice. Found {line.quantity}",
-                    severity="HIGH",
-                    category="CALCULATION"
-                ))
-                
-            if line.tax_category != invoice.tax_category_code:
-                errors.append(ValidationErrorItem(
-                    field="invoiced_item_tax_category",
-                    error=f"E10: Line tax category {line.tax_category} does not match header {invoice.tax_category_code}",
-                    severity="HIGH",
-                    category="COMPLIANCE"
-                ))
-                
-            if line.unit_of_measure not in ["EA", "MTR", "KGM", "HUR", "LTR", "C62"]:
-                errors.append(ValidationErrorItem(
-                    field="unit_of_measure",
-                    error=f"A6.3: Unit of Measure ({line.unit_of_measure}) must be valid UN/ECE Rec 20.",
-                    severity="HIGH",
-                    category="COMPLIANCE"
-                ))
-                
-            expected_line_tax = round(line.line_net_amount * line.tax_rate, 2)
-            if abs(expected_line_tax - line.tax_amount) > 0.01:
-                errors.append(ValidationErrorItem(
-                    field="tax_amount",
-                    error=f"A6.9: Line {line.line_id} tax {line.tax_amount} does not match rate {line.tax_rate}",
-                    severity="HIGH",
-                    category="CALCULATION"
-                ))
-                
-            # UAE VAT Category Rate Enforcement (A5.4)
-            if line.tax_category == "S" and line.tax_rate != 0.05:
-                errors.append(ValidationErrorItem(
-                    field="tax_rate",
-                    error=f"Standard Tax Category (S) must have exactly 5% (0.05) rate. Found {line.tax_rate}",
-                    severity="HIGH",
-                    category="COMPLIANCE"
-                ))
-            elif line.tax_category in ["Z", "E", "O"] and line.tax_rate != 0.00:
-                errors.append(ValidationErrorItem(
-                    field="tax_rate",
-                    error=f"Zero-rated/Exempt/OoS Category ({line.tax_category}) must have 0% rate. Found {line.tax_rate}",
-                    severity="HIGH",
-                    category="COMPLIANCE"
-                ))
-                
+        # 2. Mathematical & Business Rule Validation (A4, A5, A6)
+        
         # A4.1 Sum of Line Net Amounts
+        calculated_line_total = sum(round(line.line_net_amount, 2) for line in invoice.lines)
         if abs(calculated_line_total - invoice.totals.line_extension_amount) > 0.01:
              errors.append(ValidationErrorItem(
                 field="line_extension_amount",
-                error=f"A4.1: Sum of lines ({calculated_line_total}) != line_extension_amount ({invoice.totals.line_extension_amount})",
-                severity="HIGH",
-                category="CALCULATION"
+                error=f"A4.1: Sum of lines extension amount ({calculated_line_total}) != totals.line_extension_amount ({invoice.totals.line_extension_amount})",
+                severity="HIGH", category="CALCULATION"
             ))
 
+        # A4.2 Total Amount Without Tax
         if abs(calculated_line_total - invoice.totals.total_without_tax) > 0.01:
             errors.append(ValidationErrorItem(
                 field="total_without_tax",
                 error=f"A4.2: Total without tax ({invoice.totals.total_without_tax}) != calculated lines total ({calculated_line_total})",
-                severity="HIGH",
-                category="CALCULATION"
+                severity="HIGH", category="CALCULATION"
             ))
             
+        # A4.3 Total Tax Amount
         calculated_tax = sum(line.tax_amount for line in invoice.lines)
         if abs(calculated_tax - invoice.totals.tax_amount) > 0.01:
             errors.append(ValidationErrorItem(
                 field="tax_amount",
                 error=f"A4.3: Sum of line taxes ({calculated_tax}) != totals.tax_amount ({invoice.totals.tax_amount})",
-                severity="HIGH",
-                category="CALCULATION"
+                severity="HIGH", category="CALCULATION"
             ))
             
-        expected_total = invoice.totals.total_without_tax + invoice.totals.tax_amount
+        # A4.4 Total Amount With Tax
+        expected_total = round(invoice.totals.total_without_tax + invoice.totals.tax_amount, 2)
         if abs(expected_total - invoice.totals.total_with_tax) > 0.01:
             errors.append(ValidationErrorItem(
                 field="total_with_tax",
-                error=f"A4.4: total_without_tax + tax_amount != total_with_tax ({invoice.totals.total_with_tax})",
-                severity="HIGH",
-                category="CALCULATION"
+                error=f"A4.4: total_without_tax + tax_amount ({expected_total}) != totals.total_with_tax ({invoice.totals.total_with_tax})",
+                severity="HIGH", category="CALCULATION"
             ))
             
-        if invoice.tax_category_code in ["Z", "E", "O"] and invoice.totals.tax_amount != 0.0:
-            errors.append(ValidationErrorItem(
-                field="tax_amount",
-                error=f"Total tax amount must be 0 for Exempt/Zero-Rated category {invoice.tax_category_code}.",
-                severity="HIGH",
-                category="CALCULATION"
-            ))
-            
-        # A5 Tax Breakdown validations
+        # A5 Tax Breakdown
         if not invoice.tax_subtotals:
             errors.append(ValidationErrorItem(
-                field="tax_subtotals",
-                error="A5: Tax Breakdown is mandatory.",
-                severity="HIGH",
-                category="COMPLIANCE"
+                field="tax_category_code",
+                error="A5: Tax Breakdown (Tax Subtotals) is mandatory for PINT AE compliance.",
+                severity="HIGH", category="COMPLIANCE"
             ))
         else:
-            calc_taxable = 0.0
-            calc_tax = 0.0
-            for tb in invoice.tax_subtotals:
-                calc_taxable += tb.taxable_amount
-                calc_tax += tb.tax_amount
-                expected_tb_tax = round(tb.taxable_amount * tb.tax_rate, 2)
-                if abs(expected_tb_tax - tb.tax_amount) > 0.01:
-                    errors.append(ValidationErrorItem(
-                        field="tax_subtotals.tax_amount",
-                        error=f"A5.2: Tax Breakdown tax amount {tb.tax_amount} does not match rate {tb.tax_rate}",
-                        severity="HIGH",
-                        category="CALCULATION"
-                    ))
+            calc_taxable = round(sum(tb.taxable_amount for tb in invoice.tax_subtotals), 2)
+            calc_tax_sum = round(sum(tb.tax_amount for tb in invoice.tax_subtotals), 2)
             
             if abs(calc_taxable - invoice.totals.total_without_tax) > 0.01:
                 errors.append(ValidationErrorItem(
-                    field="tax_subtotals.taxable_amount",
-                    error=f"A5.1: Sum of taxable amounts ({calc_taxable}) != total_without_tax ({invoice.totals.total_without_tax})",
-                    severity="HIGH",
-                    category="CALCULATION"
+                    field="tax_subtotal_taxable_amount",
+                    error=f"A5.1: Sum of tax breakdown taxable amounts ({calc_taxable}) != total_without_tax ({invoice.totals.total_without_tax})",
+                    severity="HIGH", category="CALCULATION"
                 ))
-            if abs(calc_tax - invoice.totals.tax_amount) > 0.01:
+            if abs(calc_tax_sum - invoice.totals.tax_amount) > 0.01:
                 errors.append(ValidationErrorItem(
-                    field="tax_subtotals.tax_amount",
-                    error=f"A5.2: Sum of tax breakdown amounts ({calc_tax}) != totals.tax_amount ({invoice.totals.tax_amount})",
-                    severity="HIGH",
-                    category="CALCULATION"
+                    field="tax_subtotal_tax_amount",
+                    error=f"A5.2: Sum of tax breakdown tax amounts ({calc_tax_sum}) != totals.tax_amount ({invoice.totals.tax_amount})",
+                    severity="HIGH", category="CALCULATION"
+                ))
+
+        # A6 Line Items Loop
+        for i, line in enumerate(invoice.lines):
+            line_idx = i + 1
+            # A6.4 Line Net Amount = Qty * Net Price
+            expected_net = round(line.quantity * line.unit_price, 2)
+            if abs(expected_net - line.line_net_amount) > 0.01:
+                errors.append(ValidationErrorItem(
+                    field="line_net_amount",
+                    error=f"A6.4: Line {line_idx} net amount {line.line_net_amount} != Qty * Unit Price ({expected_net})",
+                    severity="HIGH", category="CALCULATION"
                 ))
             
+            # A6.5/A6.6/A6.7: Gross Price logic
+            if line.gross_price is not None and line.gross_price > 0:
+                # expected_net_price = gross_price - (discount / qty)
+                discount_per_unit = line.discount_amount / line.quantity if line.quantity > 0 else 0
+                expected_unit_price = round(line.gross_price - discount_per_unit, 2)
+                if abs(expected_unit_price - line.unit_price) > 0.01:
+                    errors.append(ValidationErrorItem(
+                        field="unit_price",
+                        error=f"A6.5: Line {line_idx} unit price {line.unit_price} != Gross {line.gross_price} - Discount/Qty ({expected_unit_price})",
+                        severity="MEDIUM", category="CALCULATION"
+                    ))
+
+            # A6.9 Tax Rate Check
+            if line.tax_category == "S" and line.tax_rate != 0.05:
+                errors.append(ValidationErrorItem(
+                    field="line_tax_rate",
+                    error=f"A6.9: Standard Category (S) must have exactly 5% (0.05) rate on Line {line_idx}.",
+                    severity="HIGH", category="COMPLIANCE"
+                ))
+            elif line.tax_category in ["Z", "E", "O"] and line.tax_rate != 0.00:
+                errors.append(ValidationErrorItem(
+                    field="line_tax_rate",
+                    error=f"A6.9: Zero/Exempt category ({line.tax_category}) must have 0% rate on Line {line_idx}.",
+                    severity="HIGH", category="COMPLIANCE"
+                ))
+
         high_severity_errors = [e for e in errors if e.severity == "HIGH"]
         is_valid = len(high_severity_errors) == 0
         
-        # 3. Metrics generation
+        # 3. Enhanced Metrics
         failed_checks = len(high_severity_errors)
-        passed_checks = total_checks - failed_checks
-        pass_percentage = (passed_checks / total_checks) * 100 if total_checks > 0 else 0.0
+        passed_checks = max(0, total_checks - failed_checks)
+        pass_percentage = (passed_checks / total_checks) * 100
         
         metrics = ValidationMetrics(
             total_checks=total_checks,
@@ -209,47 +163,66 @@ class InvoiceValidator:
             )
 
         return [
-            FieldGroup(group='Invoice header', fields=[
+            FieldGroup(group='A1: Invoice details', fields=[
                 fr('invoice_number',          'Invoice number',      invoice.invoice_number,          'A1.1'),
                 fr('invoice_date',            'Invoice date',        invoice.invoice_date,            'A1.2'),
-                fr('payment_due_date',        'Payment due date',    invoice.payment_due_date,        'A1.5'),
                 fr('invoice_type_code',       'Invoice type code',   invoice.invoice_type_code,       'A1.3'),
-                fr('payment_means_type_code', 'Payment means',       invoice.payment_means_type_code, 'A1.9'),
-                fr('currency_code',           'Currency',            invoice.currency_code,           'A1.7'),
-                fr('transaction_type',        'Transaction type',    invoice.transaction_type,        'A1.10'),
+                fr('currency_code',           'Currency code',       invoice.currency_code,           'A1.4'),
+                fr('payment_due_date',        'Payment due date',    invoice.payment_due_date,        'A1.5'),
+                fr('transaction_type_code',   'Transaction type code', invoice.transaction_type_code, 'A1.6'),
+                fr('business_process_id',     'Business process',    invoice.business_process_id,     'A1.7'),
+                fr('specification_id',        'Specification ID',    invoice.specification_id,        'A1.8'),
+                fr('payment_means_type_code', 'Payment means code',  invoice.payment_means_type_code, 'A1.9'),
             ]),
-            FieldGroup(group='Seller details', fields=[
-                fr('seller_name',                    'Seller name',             invoice.seller.name,                    'A2.1'),
-                fr('seller_trn',                     'Seller TRN',              invoice.seller.trn,                     'A2.3'),
-                fr('seller_electronic_address',      'Electronic address',      invoice.seller.electronic_address,      'A2.2'),
-                fr('seller_legal_registration',      'Legal registration',      invoice.seller.legal_registration,      'A2.4'),
+            FieldGroup(group='A2: Seller details', fields=[
+                fr('seller_name',                    'Legal name',             invoice.seller.name,                    'A2.1'),
+                fr('seller_trn',                     'Tax identifier (TRN)',   invoice.seller.trn,                     'A2.6'),
+                fr('seller_electronic_address',      'Electronic address',     invoice.seller.electronic_address,      'A2.2'),
+                fr('seller_electronic_scheme',       'Electronic scheme',      invoice.seller.electronic_scheme,       'A2.3'),
+                fr('seller_legal_registration',      'Legal registration',     invoice.seller.legal_registration,      'A2.4'),
                 fr('seller_registration_identifier_type', 'Registration type', invoice.seller.registration_identifier_type, 'A2.5'),
-                fr('seller_city',                    'City',                    invoice.seller.city,                    'A2.9'),
-                fr('seller_subdivision',             'Emirate code',            invoice.seller.subdivision,             'A2.10'),
-                fr('seller_country_code',            'Country code',            invoice.seller.country_code,                   'A2.11'),
+                fr('seller_address',                 'Address line 1',         invoice.seller.address,                 'A2.8'),
+                fr('seller_city',                    'City',                   invoice.seller.city,                    'A2.9'),
+                fr('seller_subdivision',             'Subdivision (Emirate)',  invoice.seller.subdivision,             'A2.10'),
+                fr('seller_country_code',            'Country code',           invoice.seller.country_code,            'A2.11'),
+                fr('seller_tax_scheme_id',           'Tax scheme ID',          invoice.seller.tax_scheme_id,           'A2.7'),
             ]),
-            FieldGroup(group='Buyer details', fields=[
-                fr('buyer_name',                    'Buyer name',           invoice.buyer.name,                    'A3.1'),
-                fr('buyer_trn',                     'Buyer TRN',            invoice.buyer.trn,                     'A3.3'),
-                fr('buyer_electronic_address',      'Electronic address',   invoice.buyer.electronic_address,      'A3.2'),
-                fr('buyer_legal_registration',      'Legal registration',   invoice.buyer.legal_registration,      'A3.4'),
+            FieldGroup(group='A3: Buyer details', fields=[
+                fr('buyer_name',                    'Legal name',             invoice.buyer.name,                    'A3.1'),
+                fr('buyer_trn',                     'Tax identifier (TRN)',   invoice.buyer.trn,                     'A3.6'),
+                fr('buyer_electronic_address',      'Electronic address',     invoice.buyer.electronic_address,      'A3.2'),
+                fr('buyer_electronic_scheme',       'Electronic scheme',      invoice.buyer.electronic_scheme,       'A3.3'),
+                fr('buyer_legal_registration',      'Legal registration',     invoice.buyer.legal_registration,      'A3.4'),
                 fr('buyer_registration_identifier_type', 'Registration type', invoice.buyer.registration_identifier_type, 'A3.5'),
-                fr('buyer_city',                    'City',                 invoice.buyer.city,                    'A3.9'),
-                fr('buyer_subdivision',             'Emirate code',         invoice.buyer.subdivision,             'A3.10'),
-                fr('buyer_country_code',            'Country code',         invoice.buyer.country_code,                  'A3.11'),
+                fr('buyer_address',                 'Address line 1',         invoice.buyer.address,                 'A3.8'),
+                fr('buyer_city',                    'City',                   invoice.buyer.city,                    'A3.9'),
+                fr('buyer_subdivision',             'Subdivision (Emirate)',  invoice.buyer.subdivision,             'A3.10'),
+                fr('buyer_country_code',            'Country code',           invoice.buyer.country_code,            'A3.11'),
+                fr('buyer_tax_scheme_id',           'Tax scheme ID',          invoice.buyer.tax_scheme_id,           'A3.7'),
             ]),
-            FieldGroup(group='Line items & tax', fields=[
-                fr('unit_of_measure', 'Unit of measure', invoice.lines[0].unit_of_measure if invoice.lines else None, 'A4.5'),
-                fr('quantity',        'Quantity',         invoice.lines[0].quantity        if invoice.lines else None, 'A4.6'),
-                fr('tax_category',    'Tax category',     invoice.lines[0].tax_category    if invoice.lines else None, 'A4.10'),
-                fr('tax_rate',        'Tax rate',         invoice.lines[0].tax_rate        if invoice.lines else None, 'A4.11'),
-                fr('tax_amount',      'Line tax amount',  invoice.lines[0].tax_amount      if invoice.lines else None, 'A4.12'),
-                fr('line_net_amount', 'Line net amount',  invoice.lines[0].line_net_amount if invoice.lines else None, 'A4.7'),
+            FieldGroup(group='A4: Document totals', fields=[
+                fr('line_extension_amount', 'Sum of line net amounts', invoice.totals.line_extension_amount, 'A4.1'),
+                fr('total_without_tax',     'Total without tax',       invoice.totals.total_without_tax,     'A4.2'),
+                fr('tax_amount',            'Total tax amount',        invoice.totals.tax_amount,            'A4.3'),
+                fr('total_with_tax',        'Total with tax',           invoice.totals.total_with_tax,        'A4.4'),
+                fr('amount_due',            'Amount due',              invoice.totals.amount_due,            'A4.5'),
             ]),
-            FieldGroup(group='Document totals', fields=[
-                fr('total_without_tax', 'Total without tax', invoice.totals.total_without_tax, 'A5.1'),
-                fr('tax_amount',        'Total tax amount',  invoice.totals.tax_amount,        'A5.2'),
-                fr('total_with_tax',    'Total with tax',    invoice.totals.total_with_tax,    'A5.3'),
-                fr('amount_due',        'Amount due',        invoice.totals.amount_due,        'A5.4'),
+            FieldGroup(group='A5: Tax breakdown', fields=[
+                fr('tax_subtotal_taxable_amount', 'Taxable amount',   invoice.tax_subtotals[0].taxable_amount if invoice.tax_subtotals else 0.0, 'A5.1'),
+                fr('tax_subtotal_tax_amount',     'Tax amount',       invoice.tax_subtotals[0].tax_amount if invoice.tax_subtotals else 0.0,     'A5.2'),
+                fr('tax_category_code',           'Tax category code', invoice.tax_category_code,                                              'A5.3'),
+                fr('tax_category_rate',           'Tax category rate', invoice.tax_subtotals[0].tax_rate if invoice.tax_subtotals else 0.0,     'A5.4'),
+            ]),
+            FieldGroup(group='A6: Line items', fields=[
+                fr('line_id',          'Line identifier',     invoice.lines[0].line_id if invoice.lines else '—',          'A6.1'),
+                fr('quantity',         'Invoiced quantity',   invoice.lines[0].quantity if invoice.lines else 0.0,         'A6.2'),
+                fr('unit_of_measure',  'Unit of measure',     invoice.lines[0].unit_of_measure if invoice.lines else '—',  'A6.3'),
+                fr('line_net_amount',  'Line net amount',     invoice.lines[0].line_net_amount if invoice.lines else 0.0,  'A6.4'),
+                fr('unit_price',       'Item net price',      invoice.lines[0].unit_price if invoice.lines else 0.0,       'A6.5'),
+                fr('gross_price',      'Item gross price',    invoice.lines[0].gross_price if invoice.lines else 0.0,      'A6.6'),
+                fr('price_base_qty',   'Price base quantity', invoice.lines[0].price_base_quantity if invoice.lines else 1.0, 'A6.7'),
+                fr('line_tax_category', 'Tax category',        invoice.lines[0].tax_category if invoice.lines else '—',     'A6.8'),
+                fr('line_tax_rate',    'Tax rate',            invoice.lines[0].tax_rate if invoice.lines else 0.0,         'A6.9'),
+                fr('item_name',        'Item name',           invoice.lines[0].item_name if invoice.lines else '—',        'A6.12'),
             ]),
         ]

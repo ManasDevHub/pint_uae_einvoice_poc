@@ -100,11 +100,9 @@ export default function ValidationReport({ stages, results, error }) {
         {vResult.field_results?.map((group, gIdx) => (
           <div key={gIdx} className="space-y-3">
             <h3 className="text-[10px] font-bold text-[#8899b0] uppercase tracking-[0.2em] flex items-center gap-2 px-1">
-              {group.group === 'Invoice header' && <Hash size={12} />}
-              {group.group === 'Seller details' && <Building2 size={12} />}
-              {group.group === 'Buyer details' && <User size={12} />}
-              {group.group === 'Line items & tax' && <ShoppingCart size={12} />}
-              {group.group === 'Document totals' && <Calculator size={12} />}
+              {group.group.includes('details') ? <Building2 size={12} /> : 
+               group.group.includes('totals') ? <Calculator size={12} /> :
+               group.group.includes('items') ? <ShoppingCart size={12} /> : <Hash size={12} />}
               {group.group}
             </h3>
             <div className="bg-white border border-[#e3eaf7] rounded-xl overflow-hidden shadow-sm divide-y divide-[#e3eaf7]">

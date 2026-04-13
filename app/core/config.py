@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./invoices.db"
     api_keys: str = "demo-key-123"
     allowed_origins: str = "*"
-    max_payload_bytes: int = 2_097_152
+    max_payload_bytes: int = 52_428_800 # 50MB
     max_batch_size: int = 500
     rate_limit_per_minute: int = 200
     duplicate_cache_ttl: int = 86400
