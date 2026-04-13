@@ -52,8 +52,34 @@ export function useInvoiceApi() {
     let parsed
     try {
       parsed = typeof payload === 'string' ? JSON.parse(payload) : payload
-    } catch {
-      setError('Invalid JSON — fix the payload and try again')
+    } catch (e) {
+      setResult('validate', {
+        status: "FAILURE",
+        report: {
+          invoice_number: "N/A",
+          is_valid: false,
+          total_errors: 1,
+          errors: [{
+            field: "JSON Structure",
+            error: `Syntax Error: ${e.message}`,
+            severity: "HIGH",
+            category: "FORMAT"
+          }],
+          metrics: { total_checks: 1, passed_checks: 0, failed_checks: 1, pass_percentage: 0.0 },
+          timestamp: new Date().toISOString(),
+          field_results: [{
+            group: "System Check",
+            fields: [{
+              field: "JSON Structure",
+              label: "JSON Structure",
+              value: "Malformed JSON",
+              status: "fail",
+              pint_ref: "FORMAT",
+              error: `Syntax Error: ${e.message}`
+            }]
+          }]
+        }
+      })
       setIsRunning(false)
       return
     }
@@ -120,8 +146,34 @@ export function useInvoiceApi() {
     let parsed
     try {
       parsed = typeof payload === 'string' ? JSON.parse(payload) : payload
-    } catch {
-      setError('Invalid JSON')
+    } catch (e) {
+      setResult(key, {
+        status: "FAILURE",
+        report: {
+          invoice_number: "N/A",
+          is_valid: false,
+          total_errors: 1,
+          errors: [{
+            field: "JSON Structure",
+            error: `Syntax Error: ${e.message}`,
+            severity: "HIGH",
+            category: "FORMAT"
+          }],
+          metrics: { total_checks: 1, passed_checks: 0, failed_checks: 1, pass_percentage: 0.0 },
+          timestamp: new Date().toISOString(),
+          field_results: [{
+            group: "System Check",
+            fields: [{
+              field: "JSON Structure",
+              label: "JSON Structure",
+              value: "Malformed JSON",
+              status: "fail",
+              pint_ref: "FORMAT",
+              error: `Syntax Error: ${e.message}`
+            }]
+          }]
+        }
+      })
       setIsRunning(false)
       return
     }

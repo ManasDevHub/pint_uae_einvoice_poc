@@ -1,3 +1,4 @@
+import json
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -6,7 +7,34 @@ import structlog
 
 log = structlog.get_logger()
 
+async def json_decode_exception_handler(request: Request, exc: json.JSONDecodeError):
+    return JSONResponse(
+        status_code=400,
+        content={
+            "status": "FAILURE",
+            "message": "Malformed JSON payload",
+            "report": {
+                "invoice_number": "N/A",
+                "is_valid": False,
+                "total_errors": 1,
+                "errors": [{
+                    "field": "JSON Structure",
+                    "error": f"Syntax Error: {exc.msg} at line {exc.lineno}, col {exc.colno}",
+                    "severity": "HIGH",
+                    "category": "FORMAT"
+                }],
+                "warnings": [],
+                "metrics": {
+                    "total_checks": 1, "passed_checks": 0, "failed_checks": 1, "pass_percentage": 0.0
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "field_results": []
+            }
+        }
+    )
+
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # ... (existing content)
     return JSONResponse(
         status_code=422,
         content={

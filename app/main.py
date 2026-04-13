@@ -126,6 +126,9 @@ async def api_key_auth(request: Request, call_next):
     return await call_next(request)
 
 # Exceptions
+import json
+from app.core.exceptions import json_decode_exception_handler
+app.add_exception_handler(json.JSONDecodeError, json_decode_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
