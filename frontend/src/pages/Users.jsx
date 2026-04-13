@@ -46,7 +46,7 @@ export default function Users() {
 
   const fetchAuditLog = async () => {
     try {
-      const res = await fetch(`${API_BASE}/auth/audit-log?limit=30`, {
+      const res = await fetch(`${API_BASE}/auth/audit-log?limit=50`, {
         headers: { 
           'Authorization': `Bearer ${getToken()}`,
           'ngrok-skip-browser-warning': 'true'

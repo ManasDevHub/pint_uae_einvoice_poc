@@ -64,9 +64,14 @@ def get_current_user(
 
 def _log_audit(db: Session, username: str, action: str, success: bool, request: Request = None, detail: str = None):
     try:
-        ip = request.client.host if request and request.client else "unknown"
-        log = AuditLog(username=username, action=action, success=success, ip_address=ip, detail=detail)
-        db.add(log)
+        # Try to get real IP if behind proxy
+        ip = "unknown"
+        if request:
+            ip = request.headers.get("X-Forwarded-For") or request.headers.get("X-Real-IP") or (request.client.host if request.client else "unknown")
+            if "," in ip: ip = ip.split(",")[0].strip() # Handle multiple proxies
+        
+        log_entry = AuditLog(username=username, action=action, success=success, ip_address=ip, detail=detail)
+        db.add(log_entry)
         db.commit()
     except Exception:
         pass  # Never let audit logging break the main flow
@@ -110,6 +115,7 @@ async def list_users(
 @router.post("/users", response_model=UserOut)
 async def create_user(
     user_data: UserCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -134,6 +140,7 @@ async def create_user(
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    _log_audit(db, current_user["username"], "USER_CREATED", True, request, f"Created user: {user_data.username}")
     return new_user
 
 @router.patch("/users/{user_id}", response_model=UserOut)
@@ -155,7 +162,14 @@ async def update_user(
     if update_data.status and current_user["role"] == "Admin": user.status = update_data.status
     if update_data.password:
         user.hashed_password = pwd_context.hash(update_data.password)
-        _log_audit(db, user.username, "PASSWORD_CHANGE", True, request)
+        _log_audit(db, current_user["username"], "PASSWORD_CHANGE", True, request, f"Changed password for: {user.username}")
+    
+    if update_data.role:
+        _log_audit(db, current_user["username"], "ROLE_CHANGED", True, request, f"Changed role for {user.username} to {update_data.role}")
+    
+    if update_data.status:
+        _log_audit(db, current_user["username"], "STATUS_CHANGED", True, request, f"Changed status for {user.username} to {update_data.status}")
+
     db.commit()
     db.refresh(user)
     return user
@@ -163,6 +177,7 @@ async def update_user(
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -176,6 +191,7 @@ async def delete_user(
     username = user.username
     db.delete(user)
     db.commit()
+    _log_audit(db, current_user["username"], "USER_DELETED", True, request, f"Deleted user: {username}")
     return {"message": f"User '{username}' deleted successfully"}
 
 @router.get("/audit-log")
@@ -201,5 +217,6 @@ async def get_audit_log(
     ]
 
 @router.post("/logout")
-async def logout():
+async def logout(request: Request, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    _log_audit(db, current_user["username"], "LOGOUT", True, request)
     return {"message": "Logged out successfully"}
