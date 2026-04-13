@@ -35,33 +35,39 @@ class BuyerDetails(BaseModel):
 
 
 class InvoiceLineItem(BaseModel):
-    line_id: Optional[str] = None
-    item_name: Optional[str] = None
-    item_description: Optional[str] = None
-    unit_of_measure: str = "EA"
-    quantity: float = 0.0
-    unit_price: float = 0.0
-    gross_price: Optional[float] = None
-    price_base_quantity: float = 1.0
-    discount_amount: float = 0.0
-    line_net_amount: float = 0.0
-    tax_category: str = "S"
-    tax_rate: float = 0.05
-    tax_amount: float = 0.0
-    aed_tax_amount: Optional[float] = None
+    model_config = ConfigDict(populate_by_name=True)
+    
+    line_id: Optional[str] = Field(None, alias="line_id")
+    item_name: Optional[str] = Field(None, alias="item_name")
+    item_description: Optional[str] = Field(None, alias="item_description")
+    unit_of_measure: str = Field("EA", alias="unit_of_measure")
+    quantity: float = Field(0.0, alias="quantity")
+    unit_price: float = Field(0.0, alias="unit_price")
+    gross_price: Optional[float] = Field(None, alias="gross_price")
+    price_base_quantity: float = Field(1.0, alias="price_base_quantity")
+    discount_amount: float = Field(0.0, alias="discount_amount")
+    line_net_amount: float = Field(0.0, alias="line_net_amount")
+    tax_category: str = Field("S", alias="tax_category")
+    tax_rate: float = Field(0.05, alias="tax_rate")
+    tax_amount: float = Field(0.0, alias="tax_amount")
+    aed_tax_amount: Optional[float] = Field(None, alias="vat_line_amount_aed") # Internal matches alias
 
 class TaxBreakdown(BaseModel):
-    tax_category_code: str = "S"
-    tax_rate: float = 0.05
-    taxable_amount: float = 0.0
-    tax_amount: float = 0.0
+    model_config = ConfigDict(populate_by_name=True)
+    
+    tax_category_code: str = Field("S", alias="tax_category_code")
+    tax_rate: float = Field(0.05, alias="tax_rate")
+    taxable_amount: float = Field(0.0, alias="taxable_amount")
+    tax_amount: float = Field(0.0, alias="tax_amount")
 
 class DocumentTotals(BaseModel):
-    line_extension_amount: float = 0.0  # Sum of line net amounts
-    total_without_tax: float = 0.0
-    tax_amount: float = 0.0
-    total_with_tax: float = 0.0
-    amount_due: float = 0.0
+    model_config = ConfigDict(populate_by_name=True)
+    
+    line_extension_amount: float = Field(0.0, alias="line_extension_amount")
+    total_without_tax: float = Field(0.0, alias="total_without_tax")
+    tax_amount: float = Field(0.0, alias="tax_amount")
+    total_with_tax: float = Field(0.0, alias="total_with_tax")
+    amount_due: float = Field(0.0, alias="amount_due")
 
 class InvoicePayload(BaseModel):
     """
@@ -137,7 +143,7 @@ class InvoicePayload(BaseModel):
             # Totals (A4)
             "line_extension_amount": self.totals.line_extension_amount,
             "total_without_tax": self.totals.total_without_tax,
-            "tax_amount": self.totals.tax_amount,
+            "tax_amount": self.totals.tax_amount, # A4.3
             "total_with_tax": self.totals.total_with_tax,
             "amount_due": self.totals.amount_due,
             
@@ -154,21 +160,22 @@ class InvoicePayload(BaseModel):
 
             # Tax Breakdown Expansion (A5) - First entry proxy for presence/format rules
             "tax_subtotal_taxable_amount": self.tax_subtotals[0].taxable_amount if self.tax_subtotals else None,
-            "tax_subtotal_tax_amount": self.tax_subtotals[0].tax_amount if self.tax_subtotals else None,
+            "tax_subtotal_tax_amount": self.tax_subtotals[0].tax_amount if self.tax_subtotals else None, # A5.2
             "tax_category_rate": self.tax_subtotals[0].tax_rate if self.tax_subtotals else None,
 
             # Line Level Proxy (First Line) - A6
             "line_id": self.lines[0].line_id if self.lines else None,
             "item_name": self.lines[0].item_name if self.lines else None,
-            "item_description": self.lines[0].item_description if self.lines else None,
+            "item_description": self.lines[0].item_description if self.lines else None, # A6.13
             "unit_of_measure": self.lines[0].unit_of_measure if self.lines else None,
             "quantity": self.lines[0].quantity if self.lines else None,
             "unit_price": self.lines[0].unit_price if self.lines else None,
-            "gross_price": self.lines[0].gross_price if self.lines else None,
+            "gross_price": self.lines[0].gross_price if self.lines else None, # A6.6
             "price_base_quantity": self.lines[0].price_base_quantity if self.lines else None,
             "line_net_amount": self.lines[0].line_net_amount if self.lines else None,
             "line_tax_category": self.lines[0].tax_category if self.lines else None,
             "line_tax_rate": self.lines[0].tax_rate if self.lines else None,
-            "vat_line_amount_aed": self.lines[0].aed_tax_amount if self.lines else None,
-            "line_amount_aed": self.lines[0].line_net_amount if self.lines else None,
+            "vat_line_amount_aed": self.lines[0].aed_tax_amount if self.lines else None, # A6.10
+            "line_amount_aed": self.lines[0].line_net_amount if self.lines else None, # A6.11 (net is used as base)
+        }
         }
