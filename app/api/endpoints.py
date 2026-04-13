@@ -57,7 +57,7 @@ def validate_invoice(request: Request, raw_payload: Dict[str, Any], db: Session 
     
     # 1. Duplicate check (Rule 8)
     fingerprint = invoice_fingerprint(raw_payload)
-    no_cache = request.query_params.get("nocache", "false").lower() == "true"
+    no_cache = True # Forced bypass to fix stale UI ghost errors
     
     if redis_client and not no_cache:
         cached = redis_client.get(f"invoice:{fingerprint}")

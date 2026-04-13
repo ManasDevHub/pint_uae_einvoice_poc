@@ -15,20 +15,35 @@ async def mock_asp_validate(
     x_pre_validated: Optional[str] = Header(None),  # optional bypass header
 ):
     """
-    ASP Mock Validation endpoint.
-    
-    IMPORTANT: This endpoint trusts that /api/v1/validate-invoice has already 
-    been called and passed. It does NOT re-run independent validation.
-    The frontend pipeline enforces the correct order:
-      validate → asp/validate → asp/submit
+    ASP Mock Validation endpoint integrated with Peppol.
     """
-    return {
-        "asp_status": "ACCEPTED",
-        "message": "Invoice accepted for FTA submission",
-        "invoice_number": payload.invoice_number,
-        "timestamp": utc_now(),
-        "asp_reference": f"ASP-{uuid4().hex[:8].upper()}",
-    }
+    from app.adapters.xml_builder import generate_ubl_xml
+    from app.validation.peppol_api import validate_with_peppol_api
+    
+    xml_str = generate_ubl_xml(payload)
+    peppol_res = await validate_with_peppol_api(xml_str)
+    
+    if peppol_res.get("status") == "valid":
+        return {
+            "status": "ACCEPTED", # for UI mapped status
+            "asp_status": "ACCEPTED",
+            "message": "Invoice passed Peppol Compliance and is accepted for FTA submission",
+            "invoice_number": payload.invoice_number,
+            "timestamp": utc_now(),
+            "asp_reference": f"ASP-{uuid4().hex[:8].upper()}",
+            "peppol_result": peppol_res
+        }
+    else:
+        errors = [f"[{e.get('rule')}] {e.get('message')}" for e in peppol_res.get('errors', [])]
+        return {
+            "status": "REJECTED",
+            "asp_status": "REJECTED",
+            "message": "Failed strictly enforced Peppol Validation Rules",
+            "invoice_number": payload.invoice_number,
+            "timestamp": utc_now(),
+            "errors": errors,
+            "peppol_result": peppol_res
+        }
 
 @router.post("/submit")
 async def mock_asp_submit(payload: InvoicePayload):
