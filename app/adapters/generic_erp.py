@@ -27,8 +27,12 @@ class GenericJSONAdapter(BaseERPAdapter):
             target = self._normalize_key(fuzzy_key)
             base = {self._normalize_key(k): v for k, v in src.items()} if src else lookup
             if target in base: return base[target]
+            
+            # Fuzzy match safety: only allow substring matches for non-dictionary return values
+            # to prevent a field like 'city' matching 'seller' and returning the whole object.
             for k, v in base.items():
-                if target in k or k in target: return v
+                if (target in k or k in target) and not isinstance(v, dict): 
+                    return v
             return default
 
         # Numeric cleanup helpers

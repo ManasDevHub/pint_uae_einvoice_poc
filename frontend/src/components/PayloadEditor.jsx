@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Copy, Check, RotateCcw, AlertCircle } from 'lucide-react'
 import { SAMPLES, DEMO_API_KEY } from '../constants/samplePayloads'
 
-export default function PayloadEditor({ value, onChange, apiKey, onApiKeyChange, validationErrors = [] }) {
+export default function PayloadEditor({ value, onChange, apiKey, onApiKeyChange, validationErrors = [], totalErrors = 0 }) {
   const [copied, setCopied] = useState(false)
   const [jsonError, setJsonError] = useState(null)
 
@@ -62,10 +62,17 @@ export default function PayloadEditor({ value, onChange, apiKey, onApiKeyChange,
           </div>
         </div>
         
-        {errorLines.length > 0 && (
+        {totalErrors > 0 && (
            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-2 text-red-600 animate-pulse">
              <AlertCircle size={14} />
-             <span className="text-xs font-bold font-mono">{errorLines.length} FIELD ERRORS</span>
+             <div className="flex flex-col">
+               <span className="text-xs font-bold font-mono">{totalErrors} FIELD ERRORS</span>
+               {totalErrors > errorLines.length && (
+                 <span className="text-[9px] font-medium opacity-80 decoration-dotted underline cursor-help" title="Some errors (like mathematical sums or missing mandatory fields) cannot be highlighted on a specific line.">
+                   +{totalErrors - errorLines.length} implicit/missing
+                 </span>
+               )}
+             </div>
            </div>
         )}
       </div>

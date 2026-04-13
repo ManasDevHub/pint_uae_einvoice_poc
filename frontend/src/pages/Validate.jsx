@@ -65,6 +65,7 @@ export default function Validate() {
               apiKey={apiKey}
               onApiKeyChange={setApiKey}
               validationErrors={results.validate?.report?.errors || []}
+              totalErrors={results.validate?.report?.total_errors || 0}
             />
           </div>
         </div>

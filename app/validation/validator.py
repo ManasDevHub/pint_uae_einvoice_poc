@@ -85,19 +85,20 @@ class InvoiceValidator:
                     category="COMPLIANCE"
                 ))
                 
-        # A4.1 Sum of Line Net Amounts
-        if abs(calculated_line_total - invoice.totals.line_extension_amount) > 0.01:
-             errors.append(ValidationErrorItem(
-                field="line_extension_amount",
-                error=f"A4.1: Sum of lines ({calculated_line_total}) != line_extension_amount ({invoice.totals.line_extension_amount})",
-                severity="HIGH",
-                category="CALCULATION"
-            ))
-
+            
+        # A4.1/A4.2 Sum of Line Net Amounts
+        # We consolidate these to avoid redundant errors for the same mismatch
         if abs(calculated_line_total - invoice.totals.total_without_tax) > 0.01:
             errors.append(ValidationErrorItem(
                 field="total_without_tax",
-                error=f"A4.2: Total without tax ({invoice.totals.total_without_tax}) != calculated lines total ({calculated_line_total})",
+                error=f"A4.2: Summary Total ({invoice.totals.total_without_tax}) != calculated Line Totals ({calculated_line_total})",
+                severity="HIGH",
+                category="CALCULATION"
+            ))
+        elif abs(invoice.totals.line_extension_amount - invoice.totals.total_without_tax) > 0.01:
+             errors.append(ValidationErrorItem(
+                field="line_extension_amount",
+                error=f"A4.1: Line Extension ({invoice.totals.line_extension_amount}) != Total without tax ({invoice.totals.total_without_tax})",
                 severity="HIGH",
                 category="CALCULATION"
             ))
@@ -151,17 +152,19 @@ class InvoiceValidator:
                         category="CALCULATION"
                     ))
             
+            
+            # Simplified A5 breakdown check: Only check summary values match totals
             if abs(calc_taxable - invoice.totals.total_without_tax) > 0.01:
                 errors.append(ValidationErrorItem(
-                    field="tax_subtotals.taxable_amount",
-                    error=f"A5.1: Sum of taxable amounts ({calc_taxable}) != total_without_tax ({invoice.totals.total_without_tax})",
+                    field="tax_subtotals",
+                    error=f"A5.1: Tax breakdown taxable sum ({calc_taxable}) != total_without_tax ({invoice.totals.total_without_tax})",
                     severity="HIGH",
                     category="CALCULATION"
                 ))
             if abs(calc_tax - invoice.totals.tax_amount) > 0.01:
                 errors.append(ValidationErrorItem(
-                    field="tax_subtotals.tax_amount",
-                    error=f"A5.2: Sum of tax breakdown amounts ({calc_tax}) != totals.tax_amount ({invoice.totals.tax_amount})",
+                    field="tax_subtotals",
+                    error=f"A5.2: Tax breakdown tax sum ({calc_tax}) != totals.tax_amount ({invoice.totals.tax_amount})",
                     severity="HIGH",
                     category="CALCULATION"
                 ))
@@ -186,7 +189,7 @@ class InvoiceValidator:
         return ValidationReport(
             invoice_number=invoice.invoice_number,
             is_valid=is_valid,
-            total_errors=len(errors),
+            total_errors=len(high_severity_errors),
             errors=high_severity_errors,
             warnings=[e for e in errors if e.severity != "HIGH"],
             metrics=metrics,
