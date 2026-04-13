@@ -179,4 +179,3 @@ class InvoicePayload(BaseModel):
             "vat_line_amount_aed": self.lines[0].aed_tax_amount if self.lines else None, # A6.10
             "line_amount_aed": self.lines[0].line_net_amount if self.lines else None, # A6.11 (net is used as base)
         }
-        }
