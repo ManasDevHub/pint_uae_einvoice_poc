@@ -139,39 +139,22 @@ async def upload_bulk(request: Request, background_tasks: BackgroundTasks, file:
 
     batch_id = f"BATCH-{uuid.uuid4().hex[:8].upper()}"
 
-    # Create ETL job record in PostgreSQL
-    db = SessionLocal()
-    try:
-        etl_job = ETLJob(
-            batch_id=batch_id,
-            tenant_id=tenant_id,
-            job_type="bulk_excel",
-            source_filename=file.filename,
-            source_format=filename.split(".")[-1],
-            status="QUEUED",
-            total_rows=0,
-        )
-        db.add(etl_job)
-        db.commit()
-        db.refresh(etl_job)
-        job_id = etl_job.id
-    finally:
-        db.close()
-
-    # Route to appropriate ETL task
+    # =========================================================================
+    # REVERTED TO SIMPLE SYNC PROCESSING (Pre-ETL Architecture)
+    # =========================================================================
     if filename.endswith(('.xlsx', '.xls', '.csv')):
-        try:
-            extract_excel(job_id, contents.hex(), file.filename, tenant_id=tenant_id)
-            log.info(f"ETL Background Job COMPLETED synchronously: job={job_id}")
-        except Exception as e:
-            log.error(f"ETL Direct Call failed: {e}")
+        import pandas as pd
+        buf = io.BytesIO(contents)
+        if filename.endswith(".csv"):
+            df = pd.read_csv(buf, dtype=str)
+        else:
+            df = pd.read_excel(buf, dtype=str)
+        
+        payloads = map_excel_to_pint_ae(df)
+        background_tasks.add_task(_process_batch, batch_id, payloads)
 
     elif filename.endswith('.xml'):
-        # Single XML — treat as single-item batch
-        try:
-            transform_batch(job_id, [contents.hex()], tenant_id=tenant_id)
-        except Exception as e:
-            log.error(f"ETL XML Transform Call failed: {e}")
+        background_tasks.add_task(_process_batch, batch_id, [contents])
 
     elif filename.endswith('.zip'):
         import zipfile
@@ -180,27 +163,16 @@ async def upload_bulk(request: Request, background_tasks: BackgroundTasks, file:
             for zinfo in z.infolist():
                 if zinfo.filename.lower().endswith('.xml'):
                     with z.open(zinfo.filename) as f:
-                        xml_payloads.append(f.read().hex())
+                        xml_payloads.append(f.read())
         if not xml_payloads:
             raise HTTPException(400, "No XML files found in ZIP")
-        
-        try:
-            transform_batch(job_id, xml_payloads, tenant_id=tenant_id)
-        except Exception as e:
-            log.error(f"ETL ZIP Transform Call failed: {e}")
+        background_tasks.add_task(_process_batch, batch_id, xml_payloads)
 
-    # Also update Redis for backward compat with old polling
-    initial_data = {"status": "PROCESSING", "total": 0, "done": 0, "batch_id": batch_id}
-    if redis_client:
-        redis_client.setex(f"batch:{batch_id}", 3600, json.dumps(initial_data))
-
+    # Return poll URL for backward compat with UI
     return {
         "batch_id": batch_id,
-        "job_id": job_id,
         "status": "QUEUED",
-        "total_rows": 0,
-        "poll_url": f"/api/v1/batch-status/{batch_id}",
-        "etl_job_url": f"/api/v1/etl-jobs/{job_id}",
+        "poll_url": f"/api/v1/batch-status/{batch_id}"
     }
 
 @router.get("/etl-jobs/{job_id}")
@@ -393,14 +365,17 @@ async def download_template():
 from sqlalchemy.orm import Session
 @router.get("/batch-status/{batch_id}")
 async def batch_status(request: Request, batch_id: str, db: Session = Depends(get_db)):
+    # 1. Check Redis (High speed)
     if redis_client:
         data = redis_client.get(f"batch:{batch_id}")
         if data:
             return json.loads(data)
-    elif batch_id in batch_results:
+            
+    # 2. Check Local Memory (Old Sync Fallback — what worked before!)
+    if batch_id in batch_results:
         return batch_results[batch_id]
         
-    # FALLBACK: Check PostgreSQL/SQLite Database
+    # 3. Last Resort Fallback: Check PostgreSQL/SQLite Database (ETL System)
     from app.db.models import ETLJob, ValidationRun, ETLRowError
     job = db.query(ETLJob).filter(ETLJob.batch_id == batch_id).first()
     if job:
