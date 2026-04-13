@@ -7,13 +7,15 @@ import { API_BASE } from '../constants/api'
 import { X, Download, AlertCircle, ExternalLink, CheckCircle2, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { downloadCsv, API_HEADERS } from '../constants/apiHelpers'
+import DateRangeFilter from '../components/ui/DateRangeFilter'
 
 const PERIODS = [
-  { key: 'all', label: 'All Time' },
   { key: 'daily', label: 'Today' },
   { key: 'monthly', label: 'Month' },
   { key: 'quarterly', label: 'Quarter' },
   { key: 'yearly', label: 'Year' },
+  { key: 'all', label: 'All Time' },
+  { key: 'custom', label: 'Custom Range' },
 ]
 
 export default function Analytics() {
@@ -28,15 +30,23 @@ export default function Analytics() {
   const [ruleSearch, setRuleSearch] = useState('')
   const [activeTab, setActiveTab] = useState('overview') // 'overview' | 'rules'
 
+  const [dateRange, setDateRange] = useState({ start: '', end: '' })
+
   useEffect(() => {
     loadSummary()
     loadRules()
-  }, [period])
+  }, [period, dateRange])
 
   async function loadSummary() {
     try {
       setLoading(true)
-      const res = await fetch(`${API_BASE}/api/v1/analytics/summary?period=${period}`, {
+      const q = new URLSearchParams()
+      q.append('period', period)
+      if (period === 'custom' && dateRange.start && dateRange.end) {
+        q.append('start_date', dateRange.start)
+        q.append('end_date', dateRange.end)
+      }
+      const res = await fetch(`${API_BASE}/api/v1/analytics/summary?${q.toString()}`, {
         headers: API_HEADERS
       })
       const json = await res.json()
@@ -51,7 +61,13 @@ export default function Analytics() {
   async function loadRules() {
     try {
       setLoadingRules(true)
-      const res = await fetch(`${API_BASE}/api/v1/analytics/rules?period=${period}`, {
+      const q = new URLSearchParams()
+      q.append('period', period)
+      if (period === 'custom' && dateRange.start && dateRange.end) {
+        q.append('start_date', dateRange.start)
+        q.append('end_date', dateRange.end)
+      }
+      const res = await fetch(`${API_BASE}/api/v1/analytics/rules?${q.toString()}`, {
         headers: API_HEADERS
       })
       const json = await res.json()
@@ -126,6 +142,16 @@ export default function Analytics() {
           <Button variant="ghost" onClick={() => { loadSummary(); loadRules() }} size="sm">Refresh</Button>
         </div>
       </div>
+
+      {period === 'custom' && (
+        <div className="flex justify-end">
+          <DateRangeFilter 
+            onChange={(range) => setDateRange(range)}
+            initialStart={dateRange.start}
+            initialEnd={dateRange.end}
+          />
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-[#e3eaf7]">
