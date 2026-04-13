@@ -4,7 +4,7 @@ import Pill from '../components/ui/Pill'
 import Button from '../components/ui/Button'
 import { Search, Download, Filter, XCircle, CheckCircle } from 'lucide-react'
 import { API_BASE } from '../constants/api'
-import { downloadCsv } from '../constants/apiHelpers'
+import { downloadCsv, API_HEADERS } from '../constants/apiHelpers'
 import toast from 'react-hot-toast'
 
 export default function History() {

@@ -47,13 +47,21 @@ class GenericJSONAdapter(BaseERPAdapter):
 
         # 2. Extract Basic Header Info
         norm_data = {
+            "specification_id": str(get_val("specification_id", "urn:peppol:pint:billing-1.0:ae:en:1.0")),
+            "business_process_id": str(get_val("business_process_id", "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0")),
             "invoice_number": cleanup_excel_number(get_val("invoice_number", get_val("invoiceno", get_val("bill_no", "INV-TEMP")))),
             "invoice_date": str(get_val("invoice_date", get_val("date", "2026-04-01"))),
             "payment_due_date": str(get_val("payment_due_date", get_val("due_date", ""))),
             "invoice_type_code": str(cleanup_excel_number(get_val("invoice_type_code", "380"))),
+            "payment_means_type_code": str(cleanup_excel_number(get_val("payment_means_type_code", "30"))),
+            "transaction_type": str(get_val("transaction_type", "B2B")),
+            "transaction_type_code": str(cleanup_excel_number(get_val("transaction_type_code", "10000000"))),
             "currency_code": str(get_val("currency_code", get_val("currency", "AED"))),
             "tax_category_code": str(get_val("tax_category_code", get_val("tax_category", "S"))),
-            "transaction_type": str(get_val("transaction_type", "B2B")),
+            "tax_point_date": get_val("tax_point_date", None),
+            "order_reference": get_val("order_reference", None),
+            "payment_terms": str(get_val("payment_terms", "Standard 30 Days")),
+            "delivery_date": get_val("delivery_date", None)
         }
         
         if not norm_data["payment_due_date"]:

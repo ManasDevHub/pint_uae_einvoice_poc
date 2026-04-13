@@ -1,6 +1,32 @@
 import { useState, useCallback } from 'react'
 import { API_BASE } from '../constants/api'
 
+function parseAndDescribeJson(raw) {
+  try {
+    return { data: JSON.parse(raw), error: null }
+  } catch (err) {
+    const msg = err.message
+    let friendly = msg
+
+    if (msg.includes('Unexpected token')) {
+      const tokenMatch = msg.match(/token '(.*?)'/)
+      const token = tokenMatch ? tokenMatch[1] : null
+      
+      const positionMatch = msg.match(/position (\d+)/)
+      
+      if (token === ',' && msg.includes('is not valid JSON')) {
+          friendly = "Syntax Error: Missing value before comma. Check your numbers and trailing commas."
+      } else if (positionMatch) {
+          const pos = parseInt(positionMatch[1], 10)
+          const context = raw.substring(Math.max(0, pos - 15), Math.min(raw.length, pos + 15))
+          friendly = `Syntax Error near: "...${context}..."`
+      }
+    }
+    return { data: null, error: friendly }
+  }
+}
+
+
 async function apiFetch(url, payload, apiKey) {
   const headers = { 
     'Content-Type': 'application/json',
@@ -50,18 +76,18 @@ export function useInvoiceApi() {
     setError(null)
 
     let parsed
-    try {
-      parsed = typeof payload === 'string' ? JSON.parse(payload) : payload
-    } catch (e) {
-      setResult('validate', {
-        status: "FAILURE",
-        report: {
-          invoice_number: "N/A",
-          is_valid: false,
-          total_errors: 1,
+    if (typeof payload === 'string') {
+      const { data, error: parseErr } = parseAndDescribeJson(payload)
+      if (parseErr) {
+        setResult('validate', {
+          status: "FAILURE",
+          report: {
+            invoice_number: "N/A",
+            is_valid: false,
+            total_errors: 1,
           errors: [{
             field: "JSON Structure",
-            error: `Syntax Error: ${e.message}`,
+            error: parseErr,
             severity: "HIGH",
             category: "FORMAT"
           }],
@@ -75,7 +101,7 @@ export function useInvoiceApi() {
               value: "Malformed JSON",
               status: "fail",
               pint_ref: "FORMAT",
-              error: `Syntax Error: ${e.message}`
+              error: parseErr
             }]
           }]
         }
@@ -144,18 +170,18 @@ export function useInvoiceApi() {
                : endpoint === '/asp/v1/validate' ? 'asp' : 'submit'
 
     let parsed
-    try {
-      parsed = typeof payload === 'string' ? JSON.parse(payload) : payload
-    } catch (e) {
-      setResult(key, {
-        status: "FAILURE",
-        report: {
-          invoice_number: "N/A",
-          is_valid: false,
-          total_errors: 1,
+    if (typeof payload === 'string') {
+      const { data, error: parseErr } = parseAndDescribeJson(payload)
+      if (parseErr) {
+        setResult(key, {
+          status: "FAILURE",
+          report: {
+            invoice_number: "N/A",
+            is_valid: false,
+            total_errors: 1,
           errors: [{
             field: "JSON Structure",
-            error: `Syntax Error: ${e.message}`,
+            error: parseErr,
             severity: "HIGH",
             category: "FORMAT"
           }],
@@ -169,7 +195,7 @@ export function useInvoiceApi() {
               value: "Malformed JSON",
               status: "fail",
               pint_ref: "FORMAT",
-              error: `Syntax Error: ${e.message}`
+              error: parseErr
             }]
           }]
         }
@@ -177,6 +203,10 @@ export function useInvoiceApi() {
       setIsRunning(false)
       return
     }
+    parsed = data
+  } else {
+    parsed = payload
+  }
 
     setStage(key, 'loading')
     try {

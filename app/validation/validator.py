@@ -208,7 +208,7 @@ class InvoiceValidator:
                 error=error_map[field].error if failed else None
             )
 
-        return [
+        groups = [
             FieldGroup(group='Invoice header', fields=[
                 fr('invoice_number',          'Invoice number',      invoice.invoice_number,          'A1.1'),
                 fr('invoice_date',            'Invoice date',        invoice.invoice_date,            'A1.2'),
@@ -217,6 +217,7 @@ class InvoiceValidator:
                 fr('payment_means_type_code', 'Payment means',       invoice.payment_means_type_code, 'A1.9'),
                 fr('currency_code',           'Currency',            invoice.currency_code,           'A1.7'),
                 fr('transaction_type',        'Transaction type',    invoice.transaction_type,        'A1.10'),
+                fr('transaction_type_code',   'Transaction type code', invoice.transaction_type_code, 'A1.6'),
             ]),
             FieldGroup(group='Seller details', fields=[
                 fr('seller_name',                    'Seller name',             invoice.seller.name,                    'A2.1'),
@@ -226,7 +227,7 @@ class InvoiceValidator:
                 fr('seller_registration_identifier_type', 'Registration type', invoice.seller.registration_identifier_type, 'A2.5'),
                 fr('seller_city',                    'City',                    invoice.seller.city,                    'A2.9'),
                 fr('seller_subdivision',             'Emirate code',            invoice.seller.subdivision,             'A2.10'),
-                fr('seller_country_code',            'Country code',            invoice.seller.country_code,                   'A2.11'),
+                fr('seller_country_code',            'Country code',            invoice.seller.country_code,            'A2.11'),
             ]),
             FieldGroup(group='Buyer details', fields=[
                 fr('buyer_name',                    'Buyer name',           invoice.buyer.name,                    'A3.1'),
@@ -236,20 +237,30 @@ class InvoiceValidator:
                 fr('buyer_registration_identifier_type', 'Registration type', invoice.buyer.registration_identifier_type, 'A3.5'),
                 fr('buyer_city',                    'City',                 invoice.buyer.city,                    'A3.9'),
                 fr('buyer_subdivision',             'Emirate code',         invoice.buyer.subdivision,             'A3.10'),
-                fr('buyer_country_code',            'Country code',         invoice.buyer.country_code,                  'A3.11'),
-            ]),
-            FieldGroup(group='Line items & tax', fields=[
-                fr('unit_of_measure', 'Unit of measure', invoice.lines[0].unit_of_measure if invoice.lines else None, 'A4.5'),
-                fr('quantity',        'Quantity',         invoice.lines[0].quantity        if invoice.lines else None, 'A4.6'),
-                fr('tax_category',    'Tax category',     invoice.lines[0].tax_category    if invoice.lines else None, 'A4.10'),
-                fr('tax_rate',        'Tax rate',         invoice.lines[0].tax_rate        if invoice.lines else None, 'A4.11'),
-                fr('tax_amount',      'Line tax amount',  invoice.lines[0].tax_amount      if invoice.lines else None, 'A4.12'),
-                fr('line_net_amount', 'Line net amount',  invoice.lines[0].line_net_amount if invoice.lines else None, 'A4.7'),
-            ]),
-            FieldGroup(group='Document totals', fields=[
-                fr('total_without_tax', 'Total without tax', invoice.totals.total_without_tax, 'A5.1'),
-                fr('tax_amount',        'Total tax amount',  invoice.totals.tax_amount,        'A5.2'),
-                fr('total_with_tax',    'Total with tax',    invoice.totals.total_with_tax,    'A5.3'),
-                fr('amount_due',        'Amount due',        invoice.totals.amount_due,        'A5.4'),
-            ]),
+                fr('buyer_country_code',            'Country code',         invoice.buyer.country_code,            'A3.11'),
+            ])
         ]
+        
+        # Dynamically append Line Items
+        for i, line in enumerate(invoice.lines):
+            line_idx_label = f"Line {i+1}"
+            groups.append(FieldGroup(group=f'{line_idx_label} details', fields=[
+                fr('line_id', f'{line_idx_label} ID', line.line_id, 'A6.1'),
+                fr('item_name', f'{line_idx_label} Item', line.item_name, 'A6.2'),
+                fr('unit_of_measure', f'{line_idx_label} UoM', line.unit_of_measure, 'A6.3'),
+                fr('quantity', f'{line_idx_label} Quantity', line.quantity, 'A6.4'),
+                fr('unit_price', f'{line_idx_label} Unit Price', line.unit_price, 'A6.5'),
+                fr('tax_category', f'{line_idx_label} Tax category', line.tax_category, 'A6.8'),
+                fr('tax_rate', f'{line_idx_label} Tax rate', line.tax_rate, 'A6.9'),
+                fr('tax_amount', f'{line_idx_label} Tax amount', line.tax_amount, 'A6.12'),
+                fr('line_net_amount', f'{line_idx_label} Net amount', line.line_net_amount, 'A6.6'),
+            ]))
+            
+        groups.append(FieldGroup(group='Document totals', fields=[
+            fr('total_without_tax', 'Total without tax', invoice.totals.total_without_tax, 'A5.1'),
+            fr('tax_amount',        'Total tax amount',  invoice.totals.tax_amount,        'A5.2'),
+            fr('total_with_tax',    'Total with tax',    invoice.totals.total_with_tax,    'A5.3'),
+            fr('amount_due',        'Amount due',        invoice.totals.amount_due,        'A5.4'),
+        ]))
+        
+        return groups

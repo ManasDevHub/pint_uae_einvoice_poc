@@ -39,8 +39,9 @@ def get_adapter():
     return GenericJSONAdapter()
 
 def invoice_fingerprint(payload: dict) -> str:
-    key = f"{payload.get('invoice_number')}:{payload.get('invoice_date')}:{payload.get('seller', {}).get('seller_trn')}"
-    return hashlib.sha256(key.encode()).hexdigest()
+    # Hash the entire payload so that ANY change triggers a new validation
+    payload_str = json.dumps(payload, sort_keys=True)
+    return hashlib.sha256(payload_str.encode()).hexdigest()
 
 from slowapi.util import get_remote_address
 from slowapi import Limiter
