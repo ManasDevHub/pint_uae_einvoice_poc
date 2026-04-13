@@ -24,44 +24,39 @@ class InvoiceValidator:
         # 2. Mathematical & Business Rule Validation (A4, A5, A6)
         
         # A4.1 Sum of Line Net Amounts
-        calculated_line_total = sum(round(line.line_net_amount or 0, 2) for line in invoice.lines)
-        lea = invoice.totals.line_extension_amount
-        if lea is not None and abs(calculated_line_total - lea) > 0.01:
+        calculated_line_total = sum(round(line.line_net_amount, 2) for line in invoice.lines)
+        if abs(calculated_line_total - invoice.totals.line_extension_amount) > 0.01:
              errors.append(ValidationErrorItem(
                 field="line_extension_amount",
-                error=f"A4.1: Sum of lines extension amount ({calculated_line_total}) != totals.line_extension_amount ({lea})",
+                error=f"A4.1: Sum of lines extension amount ({calculated_line_total}) != totals.line_extension_amount ({invoice.totals.line_extension_amount})",
                 severity="HIGH", category="CALCULATION"
             ))
 
         # A4.2 Total Amount Without Tax
-        twt = invoice.totals.total_without_tax
-        if twt is not None and abs(calculated_line_total - twt) > 0.01:
+        if abs(calculated_line_total - invoice.totals.total_without_tax) > 0.01:
             errors.append(ValidationErrorItem(
                 field="total_without_tax",
-                error=f"A4.2: Total without tax ({twt}) != calculated lines total ({calculated_line_total})",
+                error=f"A4.2: Total without tax ({invoice.totals.total_without_tax}) != calculated lines total ({calculated_line_total})",
                 severity="HIGH", category="CALCULATION"
             ))
             
         # A4.3 Total Tax Amount
-        calculated_tax = sum(line.tax_amount or 0 for line in invoice.lines)
-        ta = invoice.totals.tax_amount
-        if ta is not None and abs(calculated_tax - ta) > 0.01:
+        calculated_tax = sum(line.tax_amount for line in invoice.lines)
+        if abs(calculated_tax - invoice.totals.tax_amount) > 0.01:
             errors.append(ValidationErrorItem(
                 field="tax_amount",
-                error=f"A4.3: Sum of line taxes ({calculated_tax}) != totals.tax_amount ({ta})",
+                error=f"A4.3: Sum of line taxes ({calculated_tax}) != totals.tax_amount ({invoice.totals.tax_amount})",
                 severity="HIGH", category="CALCULATION"
             ))
             
         # A4.4 Total Amount With Tax
-        if twt is not None and ta is not None:
-            expected_total = round(twt + ta, 2)
-            twt_with_tax = invoice.totals.total_with_tax
-            if twt_with_tax is not None and abs(expected_total - twt_with_tax) > 0.01:
-                errors.append(ValidationErrorItem(
-                    field="total_with_tax",
-                    error=f"A4.4: total_without_tax + tax_amount ({expected_total}) != totals.total_with_tax ({twt_with_tax})",
-                    severity="HIGH", category="CALCULATION"
-                ))
+        expected_total = round(invoice.totals.total_without_tax + invoice.totals.tax_amount, 2)
+        if abs(expected_total - invoice.totals.total_with_tax) > 0.01:
+            errors.append(ValidationErrorItem(
+                field="total_with_tax",
+                error=f"A4.4: total_without_tax + tax_amount ({expected_total}) != totals.total_with_tax ({invoice.totals.total_with_tax})",
+                severity="HIGH", category="CALCULATION"
+            ))
             
         # A5 Tax Breakdown
         if not invoice.tax_subtotals:
@@ -71,45 +66,43 @@ class InvoiceValidator:
                 severity="HIGH", category="COMPLIANCE"
             ))
         else:
-            calc_taxable = round(sum(tb.taxable_amount or 0 for tb in invoice.tax_subtotals), 2)
-            calc_tax_sum = round(sum(tb.tax_amount or 0 for tb in invoice.tax_subtotals), 2)
+            calc_taxable = round(sum(tb.taxable_amount for tb in invoice.tax_subtotals), 2)
+            calc_tax_sum = round(sum(tb.tax_amount for tb in invoice.tax_subtotals), 2)
             
-            if twt is not None and abs(calc_taxable - twt) > 0.01:
+            if abs(calc_taxable - invoice.totals.total_without_tax) > 0.01:
                 errors.append(ValidationErrorItem(
                     field="tax_subtotal_taxable_amount",
-                    error=f"A5.1: Sum of tax breakdown taxable amounts ({calc_taxable}) != total_without_tax ({twt})",
+                    error=f"A5.1: Sum of tax breakdown taxable amounts ({calc_taxable}) != total_without_tax ({invoice.totals.total_without_tax})",
                     severity="HIGH", category="CALCULATION"
                 ))
-            if ta is not None and abs(calc_tax_sum - ta) > 0.01:
+            if abs(calc_tax_sum - invoice.totals.tax_amount) > 0.01:
                 errors.append(ValidationErrorItem(
                     field="tax_subtotal_tax_amount",
-                    error=f"A5.2: Sum of tax breakdown tax amounts ({calc_tax_sum}) != totals.tax_amount ({ta})",
+                    error=f"A5.2: Sum of tax breakdown tax amounts ({calc_tax_sum}) != totals.tax_amount ({invoice.totals.tax_amount})",
                     severity="HIGH", category="CALCULATION"
                 ))
 
         # A6 Line Items Loop
         for i, line in enumerate(invoice.lines):
             line_idx = i + 1
-            qty = line.quantity or 0
-            up = line.unit_price or 0
-            lna = line.line_net_amount or 0
             # A6.4 Line Net Amount = Qty * Net Price
-            expected_net = round(qty * up, 2)
-            if abs(expected_net - lna) > 0.01:
+            expected_net = round(line.quantity * line.unit_price, 2)
+            if abs(expected_net - line.line_net_amount) > 0.01:
                 errors.append(ValidationErrorItem(
                     field="line_net_amount",
-                    error=f"A6.4: Line {line_idx} net amount {lna} != Qty * Unit Price ({expected_net})",
+                    error=f"A6.4: Line {line_idx} net amount {line.line_net_amount} != Qty * Unit Price ({expected_net})",
                     severity="HIGH", category="CALCULATION"
                 ))
             
             # A6.5/A6.6/A6.7: Gross Price logic
             if line.gross_price is not None and line.gross_price > 0:
-                discount_per_unit = (line.discount_amount or 0) / qty if qty > 0 else 0
+                # expected_net_price = gross_price - (discount / qty)
+                discount_per_unit = line.discount_amount / line.quantity if line.quantity > 0 else 0
                 expected_unit_price = round(line.gross_price - discount_per_unit, 2)
-                if abs(expected_unit_price - up) > 0.01:
+                if abs(expected_unit_price - line.unit_price) > 0.01:
                     errors.append(ValidationErrorItem(
                         field="unit_price",
-                        error=f"A6.5: Line {line_idx} unit price {up} != Gross {line.gross_price} - Discount/Qty ({expected_unit_price})",
+                        error=f"A6.5: Line {line_idx} unit price {line.unit_price} != Gross {line.gross_price} - Discount/Qty ({expected_unit_price})",
                         severity="MEDIUM", category="CALCULATION"
                     ))
 
@@ -161,11 +154,9 @@ class InvoiceValidator:
 
         def fr(field, label, value, pint_ref):
             failed = field in error_fields
-            # Hard check for empty values to ensure UI shows "missing"
-            is_empty = value is None or str(value).strip() == ""
             return FieldResult(
                 field=field, label=label,
-                value=str(value) if not is_empty else '— missing',
+                value=str(value) if (value is not None and value != "") else '— missing',
                 status='fail' if failed else 'pass',
                 pint_ref=pint_ref,
                 error=error_map[field].error if failed else None
@@ -217,21 +208,22 @@ class InvoiceValidator:
                 fr('amount_due',            'Amount due',              invoice.totals.amount_due,            'A4.5'),
             ]),
             FieldGroup(group='A5: Tax breakdown', fields=[
-                fr('tax_subtotal_taxable_amount', 'Taxable amount',   invoice.tax_subtotals[0].taxable_amount if invoice.tax_subtotals else None, 'A5.1'),
-                fr('tax_subtotal_tax_amount',     'Tax amount',       invoice.tax_subtotals[0].tax_amount if invoice.tax_subtotals else None,     'A5.2'),
+                fr('tax_subtotal_taxable_amount', 'Taxable amount',   invoice.tax_subtotals[0].taxable_amount if invoice.tax_subtotals else 0.0, 'A5.1'),
+                fr('tax_subtotal_tax_amount',     'Tax amount',       invoice.tax_subtotals[0].tax_amount if invoice.tax_subtotals else 0.0,     'A5.2'),
                 fr('tax_category_code',           'Tax category code', invoice.tax_category_code,                                              'A5.3'),
-                fr('tax_category_rate',           'Tax category rate', invoice.tax_subtotals[0].tax_rate if invoice.tax_subtotals else None,     'A5.4'),
+                fr('tax_category_rate',           'Tax category rate', invoice.tax_subtotals[0].tax_rate if invoice.tax_subtotals else 0.0,     'A5.4'),
             ]),
             FieldGroup(group='A6: Line items', fields=[
-                fr('line_id',          'Line identifier',     invoice.lines[0].line_id if invoice.lines else None,          'A6.1'),
-                fr('quantity',         'Invoiced quantity',   invoice.lines[0].quantity if invoice.lines else None,         'A6.2'),
-                fr('unit_of_measure',  'Unit of measure',     invoice.lines[0].unit_of_measure if invoice.lines else None,  'A6.3'),
-                fr('line_net_amount',  'Line net amount',     invoice.lines[0].line_net_amount if invoice.lines else None,  'A6.4'),
-                fr('unit_price',       'Item net price',      invoice.lines[0].unit_price if invoice.lines else None,       'A6.5'),
-                fr('gross_price',      'Item gross price',    invoice.lines[0].gross_price if invoice.lines else None,      'A6.6'),
-                fr('price_base_qty',   'Price base quantity', invoice.lines[0].price_base_quantity if invoice.lines else None, 'A6.7'),
-                fr('line_tax_category', 'Tax category',        invoice.lines[0].tax_category if invoice.lines else None,     'A6.8'),
-                fr('line_tax_rate',    'Tax rate',            invoice.lines[0].tax_rate if invoice.lines else None,         'A6.9'),
-                fr('item_name',        'Item name',           invoice.lines[0].item_name if invoice.lines else None,        'A6.12'),
+                fr('line_id',          'Line identifier',     invoice.lines[0].line_id if invoice.lines else '—',          'A6.1'),
+                fr('quantity',         'Invoiced quantity',   invoice.lines[0].quantity if invoice.lines else 0.0,         'A6.2'),
+                fr('unit_of_measure',  'Unit of measure',     invoice.lines[0].unit_of_measure if invoice.lines else '—',  'A6.3'),
+                fr('line_net_amount',  'Line net amount',     invoice.lines[0].line_net_amount if invoice.lines else 0.0,  'A6.4'),
+                fr('unit_price',       'Item net price',      invoice.lines[0].unit_price if invoice.lines else 0.0,       'A6.5'),
+                fr('gross_price',      'Item gross price',    invoice.lines[0].gross_price if invoice.lines else 0.0,      'A6.6'),
+                fr('price_base_qty',   'Price base quantity', invoice.lines[0].price_base_quantity if invoice.lines else 1.0, 'A6.7'),
+                fr('line_tax_category', 'Tax category',        invoice.lines[0].tax_category if invoice.lines else '—',     'A6.8'),
+                fr('line_tax_rate',    'Tax rate',            invoice.lines[0].tax_rate if invoice.lines else 0.0,         'A6.9'),
+                fr('item_name',        'Item name',           invoice.lines[0].item_name if invoice.lines else '—',        'A6.12'),
             ]),
         ]
+]
