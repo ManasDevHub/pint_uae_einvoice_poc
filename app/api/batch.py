@@ -36,25 +36,45 @@ async def _process_batch(batch_id: str, payloads: List[Dict]):
     from app.validation.helpers import build_report_from_error
     import pydantic
     
+    from app.adapters.xml_builder import generate_ubl_xml
+    from app.validation.peppol_api import validate_with_peppol_api, map_peppol_to_internal_errors, map_peppol_to_internal_warnings
+    
     results = []
+    # Optionally gather all tasks if we want to parallelize, but sequential is safer for external APIs
     for i, payload in enumerate(payloads):
         try:
             if isinstance(payload, bytes):
                 # It's an XML byte string
                 invoice = xml_adapter.transform(payload)
                 inv_num = invoice.invoice_number
+                xml_payload = payload
             else:
                 # It's a JSON/Excel dict
                 invoice = json_adapter.transform(payload)
                 inv_num = payload.get("invoice_number", f"INV-{i+1}")
+                xml_payload = generate_ubl_xml(invoice)
                 
+            # Run local validations to get UI grid formatting
             report = validator.validate(invoice)
+            
+            # Hit external Peppol validation
+            peppol_res = await validate_with_peppol_api(xml_payload)
+            is_peppol_valid = peppol_res.get("status") == "valid"
+            
+            # Integrate Peppol errors on top of local findings
+            peppol_errors = map_peppol_to_internal_errors(peppol_res)
+            
+            # If Peppol thinks it's invalid, add its errors. We prioritize Peppol's True/False status.
+            final_validity = is_peppol_valid and report.is_valid
+            all_errors = [e.model_dump() if hasattr(e, 'model_dump') else e.__dict__ for e in report.errors] + peppol_errors
+            
             results.append({
                 "invoice_number": inv_num, 
-                "is_valid": report.is_valid, 
-                "errors": [e.model_dump() if hasattr(e, 'model_dump') else e.__dict__ for e in report.errors],
+                "is_valid": final_validity, 
+                "errors": all_errors,
                 "field_results": [g.model_dump() for g in report.field_results],
-                "raw_payload": payload
+                "raw_payload": payload,
+                "peppol_status": peppol_res.get("status", "unknown")
             })
         except pydantic.ValidationError as e:
             # Shared logic for schema failures
