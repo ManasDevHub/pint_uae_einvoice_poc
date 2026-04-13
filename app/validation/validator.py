@@ -44,9 +44,12 @@ class InvoiceValidator:
                     category="CALCULATION"
                 ))
                 
-            if line.tax_category != invoice.tax_category_code:
+            # Header-vs-Line Category Match (E10)
+            # Skip this if the header category is already flagged as invalid to avoid double counting
+            header_cat_failed = any(e.field == "tax_category_code" for e in errors)
+            if not header_cat_failed and line.tax_category != invoice.tax_category_code:
                 errors.append(ValidationErrorItem(
-                    field="invoiced_item_tax_category",
+                    field=f"line_{line.line_id}_tax_category_mismatch",
                     error=f"E10: Line tax category {line.tax_category} does not match header {invoice.tax_category_code}",
                     severity="HIGH",
                     category="COMPLIANCE"
@@ -63,7 +66,7 @@ class InvoiceValidator:
             expected_line_tax = round(line.line_net_amount * line.tax_rate, 2)
             if abs(expected_line_tax - line.tax_amount) > 0.01:
                 errors.append(ValidationErrorItem(
-                    field="tax_amount",
+                    field=f"line_{line.line_id}_tax_amount",
                     error=f"A6.9: Line {line.line_id} tax {line.tax_amount} does not match rate {line.tax_rate}",
                     severity="HIGH",
                     category="CALCULATION"
@@ -255,7 +258,8 @@ class InvoiceValidator:
                 fr('unit_price', f'{line_idx_label} Unit Price', line.unit_price, 'A6.5'),
                 fr('tax_category', f'{line_idx_label} Tax category', line.tax_category, 'A6.8'),
                 fr('tax_rate', f'{line_idx_label} Tax rate', line.tax_rate, 'A6.9'),
-                fr('tax_amount', f'{line_idx_label} Tax amount', line.tax_amount, 'A6.12'),
+                fr(f'line_{line.line_id}_tax_amount', f'{line_idx_label} Tax amount', line.tax_amount, 'A6.12'),
+                fr(f'line_{line.line_id}_tax_category_mismatch', f'{line_idx_label} Tax category match', line.tax_category, 'E10'),
                 fr('line_net_amount', f'{line_idx_label} Net amount', line.line_net_amount, 'A6.6'),
             ]))
             
