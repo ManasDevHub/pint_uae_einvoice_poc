@@ -11,10 +11,17 @@ from collections import defaultdict
 
 router = APIRouter()
 
-def _get_date_range(period: str):
-    """Return (start_date, label) for given period."""
+def _get_date_range(period: str, start_date: str = None, end_date: str = None):
+    """Return (start, end, label) for given period or custom range."""
     now = datetime.datetime.utcnow()
-    if period == "daily":
+    end = None
+    
+    if start_date and end_date:
+        start = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        dt_fmt = "%d %b %Y"
+        label = f"{start.strftime(dt_fmt)} - {end.strftime(dt_fmt)}"
+    elif period == "daily":
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         label = now.strftime("%d %b %Y")
     elif period == "monthly":
@@ -31,21 +38,25 @@ def _get_date_range(period: str):
     else:
         start = None
         label = "All Time"
-    return start, label
+    return start, end, label
 
 @router.get("/reports")
 async def get_report(
     request: Request,
     db: Session = Depends(get_db),
-    period: str = Query("monthly", description="daily | monthly | quarterly | yearly | all")
+    period: str = Query("monthly", description="daily | monthly | quarterly | yearly | all | custom"),
+    start_date: str = Query(None, description="Start date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
+    end_date: str = Query(None, description="End date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$")
 ):
     """Generate a comprehensive date-filtered report of validation activity."""
     tenant_id = getattr(request.state, "tenant_id", "anonymous")
-    start, label = _get_date_range(period)
+    start, end, label = _get_date_range(period, start_date, end_date)
 
     query = db.query(ValidationRun).filter(ValidationRun.tenant_id == tenant_id)
     if start:
         query = query.filter(ValidationRun.created_at >= start)
+    if end:
+        query = query.filter(ValidationRun.created_at <= end)
 
     runs = query.order_by(desc(ValidationRun.created_at)).all()
 
@@ -113,15 +124,19 @@ async def get_report(
 async def export_report(
     request: Request,
     db: Session = Depends(get_db),
-    period: str = Query("monthly", description="daily | monthly | quarterly | yearly | all")
+    period: str = Query("monthly", description="daily | monthly | quarterly | yearly | all | custom"),
+    start_date: str = Query(None, description="Start date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
+    end_date: str = Query(None, description="End date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$")
 ):
     """Export a comprehensive date-filtered report as CSV."""
     tenant_id = getattr(request.state, "tenant_id", "anonymous")
-    start, label = _get_date_range(period)
+    start, end, label = _get_date_range(period, start_date, end_date)
 
     query = db.query(ValidationRun).filter(ValidationRun.tenant_id == tenant_id)
     if start:
         query = query.filter(ValidationRun.created_at >= start)
+    if end:
+        query = query.filter(ValidationRun.created_at <= end)
     runs = query.order_by(desc(ValidationRun.created_at)).all()
 
     def generate():

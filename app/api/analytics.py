@@ -41,10 +41,14 @@ _HARDCODED_RULES = [
 
 ALL_RULES = _ALL_RULES + _HARDCODED_RULES
 
-def _get_date_range(period: str):
-    """Return (start_date, end_date) for given period."""
+def _get_date_range(period: str, start_date: str = None, end_date: str = None):
+    """Return (start_date, end_date) for given period or custom."""
     now = datetime.datetime.utcnow()
-    if period == "daily":
+    end = None
+    if start_date and end_date:
+        start = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+    elif period == "daily":
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     elif period == "monthly":
         start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -54,21 +58,24 @@ def _get_date_range(period: str):
     elif period == "yearly":
         start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     else:
-        return None, None  # All-time
-    return start, now
+        start = None
+    return start, (end or now)
 
-@router.get("/analytics/summary")
 async def get_analytics_summary(
     request: Request,
     db: Session = Depends(get_db),
-    period: str = Query("all", description="all | daily | monthly | quarterly | yearly")
+    period: str = Query("all", description="all | daily | monthly | quarterly | yearly | custom"),
+    start_date: str = Query(None, description="Start date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
+    end_date: str = Query(None, description="End date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$")
 ):
     try:
         tenant_id = getattr(request.state, "tenant_id", "anonymous")
         query = db.query(ValidationRun).filter(ValidationRun.tenant_id == tenant_id)
-        start, end = _get_date_range(period)
+        start, end = _get_date_range(period, start_date, end_date)
         if start:
             query = query.filter(ValidationRun.created_at >= start)
+        if end and start_date and end_date:
+            query = query.filter(ValidationRun.created_at <= end)
 
         runs = query.all()
 
@@ -136,14 +143,18 @@ async def get_analytics_summary(
 async def get_all_rules_with_stats(
     request: Request,
     db: Session = Depends(get_db),
-    period: str = Query("all", description="all | daily | monthly | quarterly | yearly")
+    period: str = Query("all", description="all | daily | monthly | quarterly | yearly | custom"),
+    start_date: str = Query(None, description="Start date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
+    end_date: str = Query(None, description="End date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$")
 ):
     """Return all 51+ PINT AE rules with live pass/fail counts from the database."""
     tenant_id = getattr(request.state, "tenant_id", "anonymous")
     query = db.query(ValidationRun).filter(ValidationRun.tenant_id == tenant_id)
-    start, end = _get_date_range(period)
+    start, end = _get_date_range(period, start_date, end_date)
     if start:
         query = query.filter(ValidationRun.created_at >= start)
+    if end and start_date and end_date:
+        query = query.filter(ValidationRun.created_at <= end)
     runs = query.all()
 
     total_runs = len(runs)

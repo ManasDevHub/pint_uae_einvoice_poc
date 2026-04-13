@@ -7,6 +7,7 @@ from app.db.models import ValidationRun
 from fastapi.responses import StreamingResponse
 import io
 import csv
+import datetime
 
 router = APIRouter()
 
@@ -18,10 +19,17 @@ async def get_history(
     limit: int = Query(50, ge=1, le=100),
     is_valid: Optional[bool] = None,
     invoice_type_code: Optional[str] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    start_date: str = Query(None, description="Start date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
+    end_date: str = Query(None, description="End date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$")
 ):
     tenant_id = getattr(request.state, "tenant_id", "anonymous")
     query = db.query(ValidationRun).filter(ValidationRun.tenant_id == tenant_id)
+    
+    if start_date and end_date:
+        start = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        query = query.filter(ValidationRun.created_at >= start, ValidationRun.created_at <= end)
     
     if search:
         search_filter = f"%{search}%"
@@ -79,11 +87,21 @@ async def get_history_detail(run_id: str, request: Request, db: Session = Depend
     }
 
 @router.get("/export/csv")
-async def export_csv(request: Request, db: Session = Depends(get_db)):
+async def export_csv(
+    request: Request,
+    db: Session = Depends(get_db),
+    start_date: str = Query(None, description="Start date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
+    end_date: str = Query(None, description="End date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$")
+):
     tenant_id = getattr(request.state, "tenant_id", "anonymous")
-    runs = db.query(ValidationRun).filter(
-        ValidationRun.tenant_id == tenant_id
-    ).order_by(desc(ValidationRun.created_at)).limit(1000).all()
+    query = db.query(ValidationRun).filter(ValidationRun.tenant_id == tenant_id)
+    
+    if start_date and end_date:
+        start = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        query = query.filter(ValidationRun.created_at >= start, ValidationRun.created_at <= end)
+        
+    runs = query.order_by(desc(ValidationRun.created_at)).limit(1000).all()
     
     def generate():
         output = io.StringIO()

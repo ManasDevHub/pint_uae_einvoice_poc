@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import { FileText, CheckCircle, XCircle, ShieldCheck, X, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { API_HEADERS } from '../constants/apiHelpers'
+import DateRangeFilter from '../components/ui/DateRangeFilter'
 
 const PERIODS = [
   { key: 'daily', label: 'Today' },
@@ -14,6 +15,7 @@ const PERIODS = [
   { key: 'quarterly', label: 'Quarter' },
   { key: 'yearly', label: 'Year' },
   { key: 'all', label: 'All Time' },
+  { key: 'custom', label: 'Custom Range' },
 ]
 
 export default function Dashboard() {
@@ -22,15 +24,22 @@ export default function Dashboard() {
   const [rulesData, setRulesData] = useState(null)
   const [showRulesModal, setShowRulesModal] = useState(false)
   const [loadingRules, setLoadingRules] = useState(false)
+  const [dateRange, setDateRange] = useState({ start: '', end: '' })
   const user = JSON.parse(localStorage.getItem('uae_invoice_user') || '{}')
 
   useEffect(() => {
     loadSummary()
-  }, [period])
+  }, [period, dateRange])
 
   async function loadSummary() {
     try {
-      const res = await fetch(`${API_BASE}/api/v1/analytics/summary?period=${period}`, {
+      const q = new URLSearchParams()
+      q.append('period', period)
+      if (period === 'custom' && dateRange.start && dateRange.end) {
+        q.append('start_date', dateRange.start)
+        q.append('end_date', dateRange.end)
+      }
+      const res = await fetch(`${API_BASE}/api/v1/analytics/summary?${q.toString()}`, {
         headers: API_HEADERS
       })
       const json = await res.json()
@@ -45,7 +54,13 @@ export default function Dashboard() {
     if (!rulesData) {
       try {
         setLoadingRules(true)
-        const res = await fetch(`${API_BASE}/api/v1/analytics/rules?period=${period}`, {
+        const q = new URLSearchParams()
+        q.append('period', period)
+        if (period === 'custom' && dateRange.start && dateRange.end) {
+          q.append('start_date', dateRange.start)
+          q.append('end_date', dateRange.end)
+        }
+        const res = await fetch(`${API_BASE}/api/v1/analytics/rules?${q.toString()}`, {
           headers: API_HEADERS
         })
         const json = await res.json()
@@ -78,20 +93,29 @@ export default function Dashboard() {
           </p>
         </div>
         {/* Period Selector */}
-        <div className="flex items-center gap-1 bg-[#f0f4ff] rounded-xl p-1">
-          {PERIODS.map(p => (
-            <button
-              key={p.key}
-              onClick={() => { setPeriod(p.key); setRulesData(null) }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                period === p.key
-                  ? 'bg-white text-[#1a6fcf] shadow-sm'
-                  : 'text-[#5a6a85] hover:text-[#1a2340]'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-1 bg-[#f0f4ff] rounded-xl p-1">
+            {PERIODS.map(p => (
+              <button
+                key={p.key}
+                onClick={() => { setPeriod(p.key); setRulesData(null) }}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  period === p.key
+                    ? 'bg-white text-[#1a6fcf] shadow-sm'
+                    : 'text-[#5a6a85] hover:text-[#1a2340]'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {period === 'custom' && (
+            <DateRangeFilter 
+              onChange={(range) => { setDateRange(range); setRulesData(null); }}
+              initialStart={dateRange.start}
+              initialEnd={dateRange.end}
+            />
+          )}
         </div>
       </div>
 

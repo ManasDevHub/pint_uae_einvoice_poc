@@ -7,12 +7,15 @@ import { downloadCsv, API_HEADERS } from '../constants/apiHelpers'
 import { Download, FileBarChart2, CheckCircle2, XCircle, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+import DateRangeFilter from '../components/ui/DateRangeFilter'
+
 const PERIODS = [
   { key: 'daily', label: 'Today', icon: '📅' },
   { key: 'monthly', label: 'Monthly', icon: '📆' },
   { key: 'quarterly', label: 'Quarterly', icon: '🗓️' },
   { key: 'yearly', label: 'Yearly', icon: '📊' },
   { key: 'all', label: 'All Time', icon: '🔍' },
+  { key: 'custom', label: 'Custom Range', icon: '⚙️' },
 ]
 
 export default function Reports() {
@@ -20,15 +23,22 @@ export default function Reports() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [dateRange, setDateRange] = useState({ start: '', end: '' })
 
   useEffect(() => {
     loadReport()
-  }, [period])
+  }, [period, dateRange])
 
   const loadReport = async () => {
     try {
       setLoading(true)
-      const res = await fetch(`${API_BASE}/api/v1/reports?period=${period}`, {
+      const q = new URLSearchParams()
+      q.append('period', period)
+      if (period === 'custom' && dateRange.start && dateRange.end) {
+        q.append('start_date', dateRange.start)
+        q.append('end_date', dateRange.end)
+      }
+      const res = await fetch(`${API_BASE}/api/v1/reports?${q.toString()}`, {
         headers: API_HEADERS
       })
       if (!res.ok) {
@@ -46,8 +56,14 @@ export default function Reports() {
 
   const handleExport = async () => {
     try {
+      const q = new URLSearchParams()
+      q.append('period', period)
+      if (period === 'custom' && dateRange.start && dateRange.end) {
+        q.append('start_date', dateRange.start)
+        q.append('end_date', dateRange.end)
+      }
       const filename = `uae_pint_ae_report_${period}_${new Date().toISOString().slice(0,10)}.csv`
-      await downloadCsv(`${API_BASE}/api/v1/reports/export?period=${period}`, filename)
+      await downloadCsv(`${API_BASE}/api/v1/reports/export?${q.toString()}`, filename)
       toast.success('Report exported successfully')
     } catch (e) {
       toast.error(`Export failed: ${e.message}`)
@@ -100,21 +116,32 @@ export default function Reports() {
       </div>
 
       {/* Period Selector */}
-      <div className="flex flex-wrap gap-3">
-        {PERIODS.map(p => (
-          <button
-            key={p.key}
-            onClick={() => setPeriod(p.key)}
-            className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${
-              period === p.key
-                ? 'border-[#1a6fcf] bg-[#f0f4ff] text-[#1a6fcf]'
-                : 'border-[#e3eaf7] bg-white text-[#5a6a85] hover:border-[#1a6fcf]/40'
-            }`}
-          >
-            <span className="text-base">{p.icon}</span>
-            {p.label}
-          </button>
-        ))}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap gap-3">
+          {PERIODS.map(p => (
+            <button
+              key={p.key}
+              onClick={() => setPeriod(p.key)}
+              className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+                period === p.key
+                  ? 'border-[#1a6fcf] bg-[#f0f4ff] text-[#1a6fcf]'
+                  : 'border-[#e3eaf7] bg-white text-[#5a6a85] hover:border-[#1a6fcf]/40'
+              }`}
+            >
+              <span className="text-base">{p.icon}</span>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {period === 'custom' && (
+          <div className="self-start">
+            <DateRangeFilter 
+              onChange={(range) => setDateRange(range)}
+              initialStart={dateRange.start}
+              initialEnd={dateRange.end}
+            />
+          </div>
+        )}
       </div>
 
       {/* KPI Summary */}

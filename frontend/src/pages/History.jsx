@@ -5,6 +5,7 @@ import Button from '../components/ui/Button'
 import { Search, Download, Filter, XCircle, CheckCircle } from 'lucide-react'
 import { API_BASE } from '../constants/api'
 import { downloadCsv, API_HEADERS } from '../constants/apiHelpers'
+import DateRangeFilter from '../components/ui/DateRangeFilter'
 import toast from 'react-hot-toast'
 
 export default function History() {
@@ -12,6 +13,7 @@ export default function History() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('All')
   const [search, setSearch] = useState('')
+  const [dateRange, setDateRange] = useState({ start: '', end: '' })
 
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -20,6 +22,10 @@ export default function History() {
         const params = new URLSearchParams()
         if (filter !== 'All') params.append('is_valid', filter === 'Valid' ? 'true' : 'false')
         if (search) params.append('search', search)
+        if (dateRange.start && dateRange.end) {
+          params.append('start_date', dateRange.start)
+          params.append('end_date', dateRange.end)
+        }
         
         const q = params.toString() ? `?${params.toString()}` : ''
         const res = await fetch(`${API_BASE}/api/v1/history${q}`, { 
@@ -35,11 +41,17 @@ export default function History() {
     }, 400) // Debounce search
 
     return () => clearTimeout(timer)
-  }, [filter, search])
+  }, [filter, search, dateRange])
 
   const handleExport = async () => {
     try {
-      await downloadCsv(`${API_BASE}/api/v1/export/csv`, 'validation_history.csv')
+      const params = new URLSearchParams()
+      if (dateRange.start && dateRange.end) {
+        params.append('start_date', dateRange.start)
+        params.append('end_date', dateRange.end)
+      }
+      const q = params.toString() ? `?${params.toString()}` : ''
+      await downloadCsv(`${API_BASE}/api/v1/export/csv${q}`, 'validation_history.csv')
       toast.success('CSV downloaded successfully')
     } catch (e) {
       toast.error(`Export failed: ${e.message}`)
@@ -89,6 +101,13 @@ export default function History() {
               </button>
             ))}
           </div>
+        </div>
+        <div className="px-4 pb-4 border-b border-[#e3eaf7] bg-[#f8faff]/50">
+           <DateRangeFilter 
+             onChange={(range) => setDateRange(range)}
+             initialStart={dateRange.start}
+             initialEnd={dateRange.end}
+           />
         </div>
 
         <div className="overflow-x-auto">
