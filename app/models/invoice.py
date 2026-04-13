@@ -9,7 +9,7 @@ class SellerDetails(BaseModel):
     address: Optional[str] = Field(None, alias="seller_address")
     city: Optional[str] = Field(None, alias="seller_city")
     subdivision: Optional[str] = Field(None, alias="seller_subdivision")  # Emirate code
-    country_code: Optional[str] = Field("AE", alias="seller_country_code")
+    country_code: Optional[str] = Field(None, alias="seller_country_code")
     electronic_address: Optional[str] = Field(None, alias="seller_electronic_address")
     electronic_scheme: Optional[str] = Field("0235", alias="seller_electronic_scheme")
     legal_registration: Optional[str] = Field(None, alias="seller_legal_registration")
@@ -25,7 +25,7 @@ class BuyerDetails(BaseModel):
     address: Optional[str] = Field(None, alias="buyer_address")
     city: Optional[str] = Field(None, alias="buyer_city")
     subdivision: Optional[str] = Field(None, alias="buyer_subdivision")
-    country_code: Optional[str] = Field("AE", alias="buyer_country_code")
+    country_code: Optional[str] = Field(None, alias="buyer_country_code")
     electronic_address: Optional[str] = Field(None, alias="buyer_electronic_address")
     electronic_scheme: Optional[str] = Field("0235", alias="buyer_electronic_scheme")
     legal_registration: Optional[str] = Field(None, alias="buyer_legal_registration")
@@ -63,11 +63,11 @@ class TaxBreakdown(BaseModel):
 class DocumentTotals(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     
-    line_extension_amount: float = Field(0.0, alias="line_extension_amount")
-    total_without_tax: float = Field(0.0, alias="total_without_tax")
-    tax_amount: float = Field(0.0, alias="tax_amount")
-    total_with_tax: float = Field(0.0, alias="total_with_tax")
-    amount_due: float = Field(0.0, alias="amount_due")
+    line_extension_amount: Optional[float] = Field(None, alias="line_extension_amount")
+    total_without_tax: Optional[float] = Field(None, alias="total_without_tax")
+    tax_amount: Optional[float] = Field(None, alias="tax_amount")
+    total_with_tax: Optional[float] = Field(None, alias="total_with_tax")
+    amount_due: Optional[float] = Field(None, alias="amount_due")
 
 class InvoicePayload(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
