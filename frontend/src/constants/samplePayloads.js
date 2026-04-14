@@ -141,34 +141,42 @@ export const SAMPLES = {
     label: 'Credit Note',
     color: 'text-violet-400',
     payload: {
+      specification_id: "urn:peppol:pint:billing-1.0:ae:en:1.0",
+      business_process_id: "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0",
       invoice_number: "CN-AE-2026-001",
       invoice_date: "2026-04-01",
       payment_due_date: "2026-04-10",
       invoice_type_code: "381",
       payment_means_type_code: "10",
       transaction_type: "B2B",
+      transaction_type_code: "10000000",
       currency_code: "AED",
       tax_category_code: "S",
       seller: {
         seller_name: "Adamas Tech Consulting LLC",
         seller_trn: "100200300400500",
         seller_electronic_address: "accounts@adamas-tech.ae",
+        seller_electronic_scheme: "0235",
+        seller_legal_registration: "DED-123",
+        seller_registration_identifier_type: "DED",
+        seller_tax_scheme_id: "VAT",
         seller_address: "Dubai Internet City",
         seller_city: "Dubai",
         seller_subdivision: "DU",
-        seller_country_code: "AE",
-        seller_legal_registration: "DED-123",
-        seller_registration_identifier_type: "DED"
+        seller_country_code: "AE"
       },
       buyer: {
         buyer_name: "Gulf Trading FZE",
         buyer_trn: "100999888777666",
+        buyer_electronic_address: "finance@gulftrade.ae",
+        buyer_electronic_scheme: "0235",
+        buyer_legal_registration: "ADGM-456",
+        buyer_registration_identifier_type: "ADGM",
+        buyer_tax_scheme_id: "VAT",
         buyer_address: "Abu Dhabi",
         buyer_city: "Abu Dhabi",
         buyer_subdivision: "AZ",
-        buyer_country_code: "AE",
-        buyer_legal_registration: "ADGM-456",
-        buyer_registration_identifier_type: "ADGM"
+        buyer_country_code: "AE"
       },
       lines: [{
         line_id: "1",

@@ -3,29 +3,36 @@ from app.models.invoice import InvoicePayload
 def generate_ubl_xml(invoice: InvoicePayload) -> str:
     """
     Generates a UBL 2.1 XML string from an InvoicePayload for PEPPOL validation.
+    Supports both 380 (Invoice) and 381 (Credit Note).
     """
     # Helper to format floats correctly
     def fv(val): return f"{val:.2f}" if val is not None else "0.00"
 
+    is_credit_note = str(invoice.invoice_type_code) == "381"
+    root_tag = "CreditNote" if is_credit_note else "Invoice"
+    namespace = f"urn:oasis:names:specification:ubl:schema:xsd:{root_tag}-2"
+    
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
-         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
-         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
-    <cbc:CustomizationID>{invoice.specification_id}</cbc:CustomizationID>
-    <cbc:ProfileID>urn:peppol:bis:billing</cbc:ProfileID>
-    <cbc:ProfileExecutionID>{invoice.transaction_type_code or "10000000"}</cbc:ProfileExecutionID>
+<{root_tag} xmlns="{namespace}"
+             xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+             xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+    <cbc:CustomizationID>{invoice.specification_id or "urn:peppol:pint:billing-1.0:ae:en:1.0"}</cbc:CustomizationID>
+    <cbc:ProfileID>{invoice.business_process_id or "urn:peppol:bis:billing"}</cbc:ProfileID>
     <cbc:ID>{invoice.invoice_number}</cbc:ID>
     <cbc:IssueDate>{invoice.invoice_date}</cbc:IssueDate>
 """
-    if invoice.payment_due_date:
-        xml += f"    <cbc:DueDate>{invoice.payment_due_date}</cbc:DueDate>\n"
+    if is_credit_note:
+        xml += f"    <cbc:CreditNoteTypeCode>{invoice.invoice_type_code}</cbc:CreditNoteTypeCode>\n"
+    else:
+        xml += f"    <cbc:InvoiceTypeCode>{invoice.invoice_type_code}</cbc:InvoiceTypeCode>\n"
 
-    xml += f"""    <cbc:InvoiceTypeCode>{invoice.invoice_type_code}</cbc:InvoiceTypeCode>
-    <cbc:DocumentCurrencyCode>{invoice.currency_code}</cbc:DocumentCurrencyCode>
-"""
+    xml += f"    <cbc:DocumentCurrencyCode>{invoice.currency_code}</cbc:DocumentCurrencyCode>\n"
     
+    # Requirement R003: Buyer Reference
+    xml += f"    <cbc:BuyerReference>{invoice.order_reference or 'NOT_PROVIDED'}</cbc:BuyerReference>\n"
+
     # Seller
-    seller_scheme = "EM" if "@" in (invoice.seller.electronic_address or "") else (invoice.seller.electronic_scheme or "0235")
+    seller_scheme = invoice.seller.electronic_scheme or ("EM" if "@" in (invoice.seller.electronic_address or "") else "0235")
     xml += f"""    <cac:AccountingSupplierParty>
         <cac:Party>
             <cbc:EndpointID schemeID="{seller_scheme}">{invoice.seller.electronic_address}</cbc:EndpointID>
@@ -43,25 +50,22 @@ def generate_ubl_xml(invoice: InvoicePayload) -> str:
             <cac:PartyTaxScheme>
                 <cbc:CompanyID>{invoice.seller.trn}</cbc:CompanyID>
                 <cac:TaxScheme>
-                    <cbc:ID>{invoice.seller.tax_scheme_id}</cbc:ID>
+                    <cbc:ID>{invoice.seller.tax_scheme_id or 'VAT'}</cbc:ID>
                 </cac:TaxScheme>
             </cac:PartyTaxScheme>
             <cac:PartyLegalEntity>
                 <cbc:RegistrationName>{invoice.seller.name}</cbc:RegistrationName>
                 <cbc:CompanyID schemeID="0235">{invoice.seller.trn}</cbc:CompanyID>
             </cac:PartyLegalEntity>
-            <cac:Contact>
-                <cbc:ElectronicMail>{invoice.seller.electronic_address}</cbc:ElectronicMail>
-            </cac:Contact>
         </cac:Party>
     </cac:AccountingSupplierParty>
 """
 
     # Buyer
-    buyer_scheme = "EM" if "@" in (invoice.buyer.electronic_address or "") else (invoice.buyer.electronic_scheme or "0235")
+    buyer_scheme = invoice.buyer.electronic_scheme or ("EM" if "@" in (invoice.buyer.electronic_address or "") else "0235")
     xml += f"""    <cac:AccountingCustomerParty>
         <cac:Party>
-            <cbc:EndpointID schemeID="{buyer_scheme}">{invoice.buyer.electronic_address}</cbc:EndpointID>
+            <cbc:EndpointID schemeID="{buyer_scheme}">{invoice.buyer.electronic_address or 'consumer@example.com'}</cbc:EndpointID>
             <cac:PartyName>
                 <cbc:Name>{invoice.buyer.name}</cbc:Name>
             </cac:PartyName>
@@ -78,45 +82,25 @@ def generate_ubl_xml(invoice: InvoicePayload) -> str:
         xml += f"\n                <cbc:CompanyID>{invoice.buyer.trn}</cbc:CompanyID>"
     xml += f"""
                 <cac:TaxScheme>
-                    <cbc:ID>{invoice.buyer.tax_scheme_id}</cbc:ID>
+                    <cbc:ID>{invoice.buyer.tax_scheme_id or 'VAT'}</cbc:ID>
                 </cac:TaxScheme>
             </cac:PartyTaxScheme>
             <cac:PartyLegalEntity>
                 <cbc:RegistrationName>{invoice.buyer.name}</cbc:RegistrationName>
                 <cbc:CompanyID schemeID="0235">{invoice.buyer.trn or "AE0000000000000"}</cbc:CompanyID>
             </cac:PartyLegalEntity>
-            <cac:Contact>
-                <cbc:ElectronicMail>{invoice.buyer.electronic_address}</cbc:ElectronicMail>
-            </cac:Contact>
         </cac:Party>
     </cac:AccountingCustomerParty>
 """
     
-    # Delivery
-    if invoice.delivery_date:
-        xml += f"""    <cac:Delivery>
-        <cbc:ActualDeliveryDate>{invoice.delivery_date}</cbc:ActualDeliveryDate>
-    </cac:Delivery>
-"""
-
-    # Payment Means
-    if invoice.payment_means_type_code:
-        xml += f"""    <cac:PaymentMeans>
-        <cbc:PaymentMeansCode>{invoice.payment_means_type_code}</cbc:PaymentMeansCode>
-        <cac:PayeeFinancialAccount>
-            <cbc:ID>{getattr(invoice.seller, 'bank_iban', 'AE000000000000000000000')}</cbc:ID>
-        </cac:PayeeFinancialAccount>
-    </cac:PaymentMeans>
-"""
-
     # Tax Total
     xml += f"""    <cac:TaxTotal>
-        <cbc:TaxAmount currencyID="{invoice.currency_code}">{fv(invoice.totals.tax_amount)}</cbc:TaxAmount>
+        <cbc:TaxAmount currencyID="{invoice.currency_code}">{fv(abs(invoice.totals.tax_amount))}</cbc:TaxAmount>
 """
     for sub in invoice.tax_subtotals:
         xml += f"""        <cac:TaxSubtotal>
-            <cbc:TaxableAmount currencyID="{invoice.currency_code}">{fv(sub.taxable_amount)}</cbc:TaxableAmount>
-            <cbc:TaxAmount currencyID="{invoice.currency_code}">{fv(sub.tax_amount)}</cbc:TaxAmount>
+            <cbc:TaxableAmount currencyID="{invoice.currency_code}">{fv(abs(sub.taxable_amount))}</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="{invoice.currency_code}">{fv(abs(sub.tax_amount))}</cbc:TaxAmount>
             <cac:TaxCategory>
                 <cbc:ID>{sub.tax_category_code}</cbc:ID>
                 <cbc:Percent>{fv(sub.tax_rate * 100)}</cbc:Percent>
@@ -129,20 +113,22 @@ def generate_ubl_xml(invoice: InvoicePayload) -> str:
     xml += "    </cac:TaxTotal>\n"
 
     # Monetary Total
-    xml += f"""    <cac:LegalMonetaryTotal>
-        <cbc:LineExtensionAmount currencyID="{invoice.currency_code}">{fv(invoice.totals.line_extension_amount)}</cbc:LineExtensionAmount>
-        <cbc:TaxExclusiveAmount currencyID="{invoice.currency_code}">{fv(invoice.totals.total_without_tax)}</cbc:TaxExclusiveAmount>
-        <cbc:TaxInclusiveAmount currencyID="{invoice.currency_code}">{fv(invoice.totals.total_with_tax)}</cbc:TaxInclusiveAmount>
-        <cbc:PayableAmount currencyID="{invoice.currency_code}">{fv(invoice.totals.amount_due)}</cbc:PayableAmount>
-    </cac:LegalMonetaryTotal>
+    total_tag = "LegalMonetaryTotal"
+    xml += f"""    <cac:{total_tag}>
+        <cbc:LineExtensionAmount currencyID="{invoice.currency_code}">{fv(abs(invoice.totals.line_extension_amount))}</cbc:LineExtensionAmount>
+        <cbc:TaxExclusiveAmount currencyID="{invoice.currency_code}">{fv(abs(invoice.totals.total_without_tax))}</cbc:TaxExclusiveAmount>
+        <cbc:TaxInclusiveAmount currencyID="{invoice.currency_code}">{fv(abs(invoice.totals.total_with_tax))}</cbc:TaxInclusiveAmount>
+        <cbc:PayableAmount currencyID="{invoice.currency_code}">{fv(abs(invoice.totals.amount_due))}</cbc:PayableAmount>
+    </cac:{total_tag}>
 """
 
     # Lines
+    line_tag = "CreditNoteLine" if is_credit_note else "InvoiceLine"
     for line in invoice.lines:
-        xml += f"""    <cac:InvoiceLine>
+        xml += f"""    <cac:{line_tag}>
         <cbc:ID>{line.line_id}</cbc:ID>
-        <cbc:InvoicedQuantity unitCode="{line.unit_of_measure}">{line.quantity}</cbc:InvoicedQuantity>
-        <cbc:LineExtensionAmount currencyID="{invoice.currency_code}">{fv(line.line_net_amount)}</cbc:LineExtensionAmount>
+        <cbc:{"CreditedQuantity" if is_credit_note else "InvoicedQuantity"} unitCode="{line.unit_of_measure}">{abs(line.quantity)}</cbc:{"CreditedQuantity" if is_credit_note else "InvoicedQuantity"}>
+        <cbc:LineExtensionAmount currencyID="{invoice.currency_code}">{fv(abs(line.line_net_amount))}</cbc:LineExtensionAmount>
         <cac:Item>
             <cbc:Name>{line.item_name}</cbc:Name>
             <cac:ClassifiedTaxCategory>
@@ -154,9 +140,10 @@ def generate_ubl_xml(invoice: InvoicePayload) -> str:
             </cac:ClassifiedTaxCategory>
         </cac:Item>
         <cac:Price>
-            <cbc:PriceAmount currencyID="{invoice.currency_code}">{fv(line.unit_price)}</cbc:PriceAmount>
+            <cbc:PriceAmount currencyID="{invoice.currency_code}">{fv(abs(line.unit_price))}</cbc:PriceAmount>
         </cac:Price>
-    </cac:InvoiceLine>
+    </cac:{line_tag}>
 """
-    xml += "</Invoice>"
+    xml += f"</{root_tag}>"
+    return xml
     return xml
