@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     api_version: str = "1.0.0"
     redis_url: str = "redis://localhost:6379/0"
-    database_url: str = "sqlite:///./invoices.db"
+    database_url: str = "sqlite:///./uae_einvoice.db"
     api_keys: str = "demo-key-123"
     allowed_origins: str = "*"
     max_payload_bytes: int = 52_428_800 # 50MB

@@ -24,10 +24,12 @@ except Exception:
 
 batch_results: dict = {}
 
-async def _process_batch(batch_id: str, payloads: List[Dict]):
+async def _process_batch(batch_id: str, payloads: List[Dict], tenant_id: str = "anonymous"):
     from app.validation.validator import InvoiceValidator
     from app.adapters.generic_erp import GenericJSONAdapter
     from app.adapters.ubl_xml import UBLXMLAdapter
+    from app.db.models import ValidationRun, ETLJob
+    from app.db.session import SessionLocal
     
     validator = InvoiceValidator()
     json_adapter = GenericJSONAdapter()
@@ -39,80 +41,106 @@ async def _process_batch(batch_id: str, payloads: List[Dict]):
     from app.adapters.xml_builder import generate_ubl_xml
     from app.validation.peppol_api import validate_with_peppol_api, map_peppol_to_internal_errors, map_peppol_to_internal_warnings
     
+    db = SessionLocal()
     results = []
-    # Optionally gather all tasks if we want to parallelize, but sequential is safer for external APIs
-    for i, payload in enumerate(payloads):
-        try:
-            if isinstance(payload, bytes):
-                # It's an XML byte string
-                invoice = xml_adapter.transform(payload)
-                inv_num = invoice.invoice_number
-                xml_payload = payload
-            else:
-                # It's a JSON/Excel dict
-                invoice = json_adapter.transform(payload)
-                inv_num = payload.get("invoice_number", f"INV-{i+1}")
-                xml_payload = generate_ubl_xml(invoice)
+    try:
+        for i, payload in enumerate(payloads):
+            try:
+                if isinstance(payload, bytes):
+                    invoice = xml_adapter.transform(payload)
+                    inv_num = invoice.invoice_number
+                    xml_payload = payload
+                else:
+                    invoice = json_adapter.transform(payload)
+                    inv_num = payload.get("invoice_number", f"INV-{i+1}")
+                    xml_payload = generate_ubl_xml(invoice)
+                    
+                report = validator.validate(invoice)
+                peppol_res = await validate_with_peppol_api(xml_payload)
+                is_peppol_valid = peppol_res.get("status") == "valid"
+                peppol_errors = map_peppol_to_internal_errors(peppol_res)
                 
-            # Run local validations to get UI grid formatting
-            report = validator.validate(invoice)
-            
-            # Hit external Peppol validation
-            peppol_res = await validate_with_peppol_api(xml_payload)
-            is_peppol_valid = peppol_res.get("status") == "valid"
-            
-            # Integrate Peppol errors on top of local findings
-            peppol_errors = map_peppol_to_internal_errors(peppol_res)
-            
-            # If Peppol thinks it's invalid, add its errors. We prioritize Peppol's True/False status.
-            final_validity = is_peppol_valid and report.is_valid
-            all_errors = [e.model_dump() if hasattr(e, 'model_dump') else e.__dict__ for e in report.errors] + peppol_errors
-            
-            results.append({
-                "invoice_number": inv_num, 
-                "is_valid": final_validity, 
-                "errors": all_errors,
-                "field_results": [g.model_dump() for g in report.field_results],
-                "raw_payload": payload,
-                "peppol_status": peppol_res.get("status", "unknown")
-            })
-        except pydantic.ValidationError as e:
-            # Shared logic for schema failures
-            # Robust lookup for invoice number
-            inv_num = "Unknown"
-            if isinstance(payload, dict):
-                # Try common names for invoice number
-                for k in ["invoice_number", "invoiceno", "bill_no", "invoice", "id"]:
-                    for pk in payload.keys():
-                        if k in str(pk).lower().replace(" ", "").replace("_", ""):
-                            inv_num = str(payload[pk])
-                            break
-                    if inv_num != "Unknown": break
-            
-            report = build_report_from_error(e, invoice_number=inv_num)
-            results.append({
-                "invoice_number": report.invoice_number, 
-                "is_valid": False, 
-                "errors": [e.model_dump() for e in report.errors],
-                "field_results": [g.model_dump() for g in report.field_results],
-                "raw_payload": payload
-            })
-        except Exception as e:
-            results.append({
-                "invoice_number": "Unknown", 
-                "is_valid": False, 
-                "error": str(e),
-                "raw_payload": payload
-            })
-            
-        data = {"status": "PROCESSING", "total": len(payloads), "done": i + 1, "results": results if (i + 1) == len(payloads) else []}
-        if (i + 1) == len(payloads):
-             data["status"] = "COMPLETE"
-             
-        if redis_client:
-            redis_client.setex(f"batch:{batch_id}", 3600, json.dumps(data))
-        else:
-            batch_results[batch_id] = data
+                final_validity = is_peppol_valid and report.is_valid
+                all_errors = [e.model_dump() if hasattr(e, 'model_dump') else e.__dict__ for e in report.errors] + peppol_errors
+                
+                from datetime import datetime, timezone
+                # PERSIST TO DATABASE
+                run = ValidationRun(
+                    tenant_id=tenant_id,
+                    invoice_number=inv_num,
+                    invoice_date=invoice.invoice_date,
+                    transaction_type=invoice.transaction_type,
+                    invoice_type_code=invoice.invoice_type_code,
+                    is_valid=final_validity,
+                    total_errors=len(all_errors),
+                    errors_json=all_errors,
+                    raw_payload=payload if isinstance(payload, dict) else {"xml": "UBL XML Payload"},
+                    pass_percentage=100 - (len(all_errors) * 2) if final_validity else max(0, 100 - (len(all_errors) * 5)),
+                    created_at=datetime.now(timezone.utc)
+                )
+                db.add(run)
+                db.commit()
+
+                results.append({
+                    "id": run.id,
+                    "invoice_number": inv_num, 
+                    "is_valid": final_validity, 
+                    "errors": all_errors,
+                    "field_results": [g.model_dump() for g in report.field_results],
+                    "raw_payload": payload,
+                    "peppol_status": peppol_res.get("status", "unknown")
+                })
+            except pydantic.ValidationError as e:
+                inv_num = "Unknown"
+                if isinstance(payload, dict):
+                    for k in ["invoice_number", "invoiceno", "bill_no", "invoice", "id"]:
+                        for pk in payload.keys():
+                            if k in str(pk).lower().replace(" ", "").replace("_", ""):
+                                inv_num = str(payload[pk])
+                                break
+                        if inv_num != "Unknown": break
+                
+                report = build_report_from_error(e, invoice_number=inv_num)
+                all_errors = [e.model_dump() for e in report.errors]
+                
+                # PERSIST EVEN ON SCHEMA ERROR
+                run = ValidationRun(
+                    tenant_id=tenant_id,
+                    invoice_number=inv_num,
+                    is_valid=False,
+                    total_errors=len(all_errors),
+                    errors_json=all_errors,
+                    raw_payload=payload if isinstance(payload, dict) else {}
+                )
+                db.add(run)
+                db.commit()
+
+                results.append({
+                    "id": run.id,
+                    "invoice_number": report.invoice_number, 
+                    "is_valid": False, 
+                    "errors": all_errors,
+                    "field_results": [g.model_dump() for g in report.field_results],
+                    "raw_payload": payload
+                })
+            except Exception as e:
+                results.append({
+                    "invoice_number": "Unknown", 
+                    "is_valid": False, 
+                    "error": str(e),
+                    "raw_payload": payload
+                })
+                
+            data = {"status": "PROCESSING", "total": len(payloads), "done": i + 1, "results": results if (i + 1) == len(payloads) else []}
+            if (i + 1) == len(payloads):
+                 data["status"] = "COMPLETE"
+                 
+            if redis_client:
+                redis_client.setex(f"batch:{batch_id}", 3600, json.dumps(data))
+            else:
+                batch_results[batch_id] = data
+    finally:
+        db.close()
 
 @router.post("/batch-validate")
 async def batch_validate(request: Request, payloads: List[Dict[str, Any]], background_tasks: BackgroundTasks):
@@ -171,10 +199,10 @@ async def upload_bulk(request: Request, background_tasks: BackgroundTasks, file:
             df = pd.read_excel(buf, dtype=str)
         
         payloads = map_excel_to_pint_ae(df)
-        background_tasks.add_task(_process_batch, batch_id, payloads)
+        background_tasks.add_task(_process_batch, batch_id, payloads, tenant_id=tenant_id)
 
     elif filename.endswith('.xml'):
-        background_tasks.add_task(_process_batch, batch_id, [contents])
+        background_tasks.add_task(_process_batch, batch_id, [contents], tenant_id=tenant_id)
 
     elif filename.endswith('.zip'):
         import zipfile
@@ -188,7 +216,7 @@ async def upload_bulk(request: Request, background_tasks: BackgroundTasks, file:
         
         if not xml_payloads:
             raise HTTPException(400, "No XML files found in ZIP (or all ignored due to batch limit)")
-        background_tasks.add_task(_process_batch, batch_id, xml_payloads)
+        background_tasks.add_task(_process_batch, batch_id, xml_payloads, tenant_id=tenant_id)
 
     # Return poll URL for backward compat with UI
     return {
@@ -248,20 +276,22 @@ async def download_template():
     
     TEXT_COLUMNS = {
         "invoice_type_code", "payment_means_type_code", "currency_code",
-        "tax_category_code", "transaction_type", "seller_country_code",
-        "buyer_country_code", "unit_of_measure", "tax_category",
+        "tax_category_code", "transaction_type", "transaction_type_code",
+        "seller_country_code", "buyer_country_code", "unit_of_measure", "tax_category",
         "seller_trn", "buyer_trn", "line_id",
         "seller_subdivision", "buyer_subdivision",
         "seller_registration_identifier_type", "buyer_registration_identifier_type",
+        "seller_electronic_address", "buyer_electronic_address",
+        "seller_bank_iban", "buyer_reference"
     }
     
     TEMPLATE_COLUMNS = [
         "invoice_number", "invoice_date", "payment_due_date", "invoice_type_code",
-        "payment_means_type_code", "transaction_type", "currency_code",
-        "tax_category_code",
-        "seller_name", "seller_trn", "seller_address", "seller_city", "seller_subdivision", "seller_country_code", 
+        "payment_means_type_code", "transaction_type", "transaction_type_code", "currency_code",
+        "tax_category_code", "buyer_reference",
+        "seller_name", "seller_trn", "seller_electronic_address", "seller_bank_iban", "seller_address", "seller_city", "seller_subdivision", "seller_country_code", 
         "seller_legal_registration", "seller_registration_identifier_type",
-        "buyer_name", "buyer_trn", "buyer_address", "buyer_city", "buyer_subdivision", "buyer_country_code",
+        "buyer_name", "buyer_trn", "buyer_electronic_address", "buyer_address", "buyer_city", "buyer_subdivision", "buyer_country_code",
         "buyer_legal_registration", "buyer_registration_identifier_type",
         "line_id", "item_name", "unit_of_measure",
         "quantity", "unit_price", "line_net_amount",
@@ -277,10 +307,14 @@ async def download_template():
             "invoice_type_code": "380",        
             "payment_means_type_code": "30",   
             "transaction_type": "B2B",
+            "transaction_type_code": "10000000",
             "currency_code": "AED",
             "tax_category_code": "S",
+            "buyer_reference": "PO-12345",
             "seller_name": "Adamas Tech Corp",
-            "seller_trn": "100200300400500",
+            "seller_trn": "AE100200300400500",
+            "seller_electronic_address": "accounts@adamas-tech.ae",
+            "seller_bank_iban": "AE123456789012345678901",
             "seller_address": "Dubai Silicon Oasis",
             "seller_city": "Dubai",
             "seller_subdivision": "DU",
@@ -288,7 +322,8 @@ async def download_template():
             "seller_legal_registration": "L-1002003",
             "seller_registration_identifier_type": "Trade License",
             "buyer_name": "Client Group FZE",
-            "buyer_trn": "100999888777666",
+            "buyer_trn": "AE100999888777666",
+            "buyer_electronic_address": "finance@client-group.ae",
             "buyer_address": "Abu Dhabi Global Market",
             "buyer_city": "Abu Dhabi",
             "buyer_subdivision": "AZ",
@@ -315,10 +350,14 @@ async def download_template():
             "invoice_type_code": "380",
             "payment_means_type_code": "10",   
             "transaction_type": "B2C",
+            "transaction_type_code": "01000000",
             "currency_code": "AED",
             "tax_category_code": "S",
+            "buyer_reference": "POS-CASH-001",
             "seller_name": "Adamas Tech Corp",
-            "seller_trn": "100200300400500",
+            "seller_trn": "AE100200300400500",
+            "seller_electronic_address": "pos@adamas-tech.ae",
+            "seller_bank_iban": "AE123456789012345678901",
             "seller_address": "Dubai Silicon Oasis",
             "seller_city": "Dubai",
             "seller_subdivision": "DU",
@@ -327,6 +366,7 @@ async def download_template():
             "seller_registration_identifier_type": "Trade License",
             "buyer_name": "Individual Customer",
             "buyer_trn": "",                   
+            "buyer_electronic_address": "consumer@example.com",
             "buyer_address": "Sharjah City",
             "buyer_city": "Sharjah",
             "buyer_subdivision": "SH",

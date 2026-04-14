@@ -28,10 +28,11 @@ class GenericJSONAdapter(BaseERPAdapter):
             base = {self._normalize_key(k): v for k, v in src.items()} if src else lookup
             if target in base: return base[target]
             
-            # Fuzzy match safety: only allow substring matches for non-dictionary return values
-            # to prevent a field like 'city' matching 'seller' and returning the whole object.
+            # Fuzzy match safety: 
+            # 1. Prefer keys that contain the target (e.g. 'invoice_no' contains 'invoice')
+            # 2. Avoid keys that ARE substrings of target (e.g. 'type' should not match 'transaction_type_code')
             for k, v in base.items():
-                if (target in k or k in target) and not isinstance(v, dict): 
+                if target in k and not isinstance(v, dict): 
                     return v
             return default
 
@@ -65,7 +66,8 @@ class GenericJSONAdapter(BaseERPAdapter):
             "tax_point_date": get_val("tax_point_date", None),
             "order_reference": get_val("order_reference", None),
             "payment_terms": str(get_val("payment_terms", "Standard 30 Days")),
-            "delivery_date": get_val("delivery_date", None)
+            "delivery_date": get_val("delivery_date", None),
+            "buyer_reference": get_val("buyer_reference", get_val("reference", "REF-001"))
         }
         
         if not norm_data["payment_due_date"]:
@@ -75,6 +77,10 @@ class GenericJSONAdapter(BaseERPAdapter):
         raw_seller = get_val("seller")
         if isinstance(raw_seller, dict):
             seller_trn = cleanup_excel_number(get_val("trn", get_val("seller_trn", ""), src=raw_seller))
+            # PINT AE Requirement: TRNs must have a country prefix (e.g. AE)
+            if seller_trn and len(seller_trn) == 15 and not seller_trn.startswith("AE"):
+                seller_trn = f"AE{seller_trn}"
+            
             norm_data["seller"] = {
                 "name": str(get_val("name", get_val("seller_name", "Adamas Tech Consulting"), src=raw_seller)),
                 "trn": seller_trn if seller_trn else None,
@@ -82,12 +88,17 @@ class GenericJSONAdapter(BaseERPAdapter):
                 "city": str(get_val("city", get_val("seller_city", "Dubai"), src=raw_seller)),
                 "subdivision": str(get_val("subdivision", "DU", src=raw_seller)).upper(),
                 "country_code": str(get_val("country_code", "AE", src=raw_seller)),
-                "electronic_address": str(get_val("electronic_address", seller_trn, src=raw_seller)),
+                "electronic_address": str(get_val("electronic_address", get_val("seller_electronic_address", ""), src=raw_seller)),
+                "electronic_scheme": str(get_val("electronic_scheme", get_val("seller_electronic_scheme", "0235"), src=raw_seller)),
                 "legal_registration": str(get_val("legal_registration", "DED-998877", src=raw_seller)),
                 "registration_identifier_type": str(get_val("registration_identifier_type", "DED", src=raw_seller)),
+                "bank_iban": str(get_val("bank_iban", get_val("seller_bank_iban", "AE000000000000000000000"), src=raw_seller)),
             }
         else:
             seller_trn = cleanup_excel_number(get_val("seller_trn", get_val("trn", "")))
+            if seller_trn and len(seller_trn) == 15 and not seller_trn.startswith("AE"):
+                seller_trn = f"AE{seller_trn}"
+
             norm_data["seller"] = {
                 "name": str(get_val("seller_name", get_val("seller", "Adamas Tech Consulting"))),
                 "trn": seller_trn if seller_trn else None,
@@ -95,15 +106,24 @@ class GenericJSONAdapter(BaseERPAdapter):
                 "city": str(get_val("seller_city", "Dubai")),
                 "subdivision": str(get_val("seller_subdivision", get_val("seller_emirate", "DU"))).upper(),
                 "country_code": str(get_val("seller_country_code", "AE")),
-                "electronic_address": str(get_val("seller_electronic_address", seller_trn)),
+                "electronic_address": str(get_val("seller_electronic_address", "")),
+                "electronic_scheme": str(get_val("seller_electronic_scheme", "0235")),
                 "legal_registration": str(get_val("seller_legal_registration", "DED-998877")),
                 "registration_identifier_type": str(get_val("seller_registration_identifier_type", "DED")),
+                "bank_iban": str(get_val("seller_bank_iban", "AE000000000000000000000")),
             }
+        
+        # Default seller electronic address to TRN if empty
+        if not norm_data["seller"]["electronic_address"]:
+            norm_data["seller"]["electronic_address"] = norm_data["seller"]["trn"] or "accounts@adamas-tech.ae"
 
         # 4. Handle Buyer (Nested vs Flat)
         raw_buyer = get_val("buyer")
         if isinstance(raw_buyer, dict):
             buyer_trn = cleanup_excel_number(get_val("trn", get_val("buyer_trn", ""), src=raw_buyer))
+            if buyer_trn and len(buyer_trn) == 15 and not buyer_trn.startswith("AE"):
+                buyer_trn = f"AE{buyer_trn}"
+
             norm_data["buyer"] = {
                 "name": str(get_val("name", get_val("buyer_name", "Walk-in Customer"), src=raw_buyer)),
                 "trn": buyer_trn if buyer_trn else None,
@@ -111,23 +131,42 @@ class GenericJSONAdapter(BaseERPAdapter):
                 "city": str(get_val("city", get_val("buyer_city", "Dubai"), src=raw_buyer)),
                 "subdivision": str(get_val("subdivision", "DU", src=raw_buyer)).upper(),
                 "country_code": str(get_val("country_code", "AE", src=raw_buyer)),
-                "electronic_address": str(get_val("electronic_address", buyer_trn if buyer_trn else "CONSUMER", src=raw_buyer)),
+                "electronic_address": str(get_val("electronic_address", get_val("buyer_electronic_address", ""), src=raw_buyer)),
+                "electronic_scheme": str(get_val("electronic_scheme", get_val("buyer_electronic_scheme", "0235"), src=raw_buyer)),
                 "legal_registration": str(get_val("legal_registration", buyer_trn if buyer_trn else "L-123456", src=raw_buyer)),
                 "registration_identifier_type": str(get_val("registration_identifier_type", "DED", src=raw_buyer)),
             }
         else:
             buyer_trn = cleanup_excel_number(get_val("buyer_trn", ""))
+            if buyer_trn and len(buyer_trn) == 15 and not buyer_trn.startswith("AE"):
+                buyer_trn = f"AE{buyer_trn}"
+
             norm_data["buyer"] = {
                 "name": str(get_val("buyer_name", get_val("buyer", "Walk-in Customer"))),
-                "trn": buyer_trn if len(buyer_trn) >= 15 else None,
+                "trn": buyer_trn if buyer_trn else None,
                 "address": str(get_val("buyer_address", "UAE")),
                 "city": str(get_val("buyer_city", "Dubai")),
                 "subdivision": str(get_val("buyer_subdivision", get_val("buyer_emirate", "DU"))).upper(),
                 "country_code": str(get_val("buyer_country_code", "AE")),
-                "electronic_address": str(get_val("buyer_electronic_address", buyer_trn if buyer_trn else "CONSUMER")),
+                "electronic_address": str(get_val("buyer_electronic_address", "")),
+                "electronic_scheme": str(get_val("buyer_electronic_scheme", "0235")),
                 "legal_registration": str(get_val("buyer_legal_registration", buyer_trn if buyer_trn else "L-123456")),
                 "registration_identifier_type": str(get_val("buyer_registration_identifier_type", "DED" if not buyer_trn else "TRN")),
             }
+        
+        # Default buyer electronic address if empty
+        if not norm_data["buyer"]["electronic_address"]:
+            if norm_data["transaction_type"].upper() == "B2B":
+                norm_data["buyer"]["electronic_address"] = norm_data["buyer"]["trn"] or "finance@client-group.ae"
+            else:
+                norm_data["buyer"]["electronic_address"] = "consumer@example.com"
+
+        # Explicitly align transaction_type_code if not provided
+        provided_code = str(cleanup_excel_number(get_val("transaction_type_code", "")))
+        if not provided_code or provided_code == "":
+            norm_data["transaction_type_code"] = "10000000" if norm_data["transaction_type"] == "B2B" else "01000000"
+        else:
+            norm_data["transaction_type_code"] = provided_code
 
         # 5. Handle Lines (Extreme robustness)
         lines = []

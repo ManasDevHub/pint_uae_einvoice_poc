@@ -68,12 +68,23 @@ def _log_audit(db: Session, username: str, action: str, success: bool, request: 
         # Try to get real IP if behind proxy
         ip = "unknown"
         if request:
-            ip = request.headers.get("X-Forwarded-For") or request.headers.get("X-Real-IP") or (request.client.host if request.client else "unknown")
-            if "," in ip: ip = ip.split(",")[0].strip() # Handle multiple proxies
-            # Strict truncation for DB safety (max 50 chars as defined in model)
-            ip = ip[:50]
+            try:
+                ip = request.headers.get("X-Forwarded-For") or request.headers.get("X-Real-IP") or (request.client.host if request.client else "unknown")
+                if ip and "," in ip: 
+                    ip = ip.split(",")[0].strip() # Handle multiple proxies
+            except Exception:
+                ip = "error"
         
-        log_entry = AuditLog(username=username, action=action, success=success, ip_address=ip, detail=detail)
+        # Strict truncation for DB safety (max 50 chars as defined in model)
+        safe_ip = str(ip)[:50] if ip else "unknown"
+        
+        log_entry = AuditLog(
+            username=str(username)[:100], 
+            action=str(action)[:50], 
+            success=success, 
+            ip_address=safe_ip, 
+            detail=str(detail)[:1000] if detail else None
+        )
         db.add(log_entry)
         db.commit()
     except Exception as e:

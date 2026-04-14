@@ -47,12 +47,33 @@ def _sqlite_migrate():
             "ALTER TABLE users ADD COLUMN last_login DATETIME",
             "ALTER TABLE validation_runs ADD COLUMN seller_trn TEXT",
             "ALTER TABLE validation_runs ADD COLUMN transaction_type TEXT",
+            "CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, action TEXT, success BOOLEAN, ip_address TEXT, detail TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
         ]:
             try:
-                conn.execute(text(stmt))
-                conn.commit()
+                # For audit_logs, if it exists but is broken, we might need to drop it.
+                # However, for a POC, force-fixing it is safer for the demo.
+                if "CREATE TABLE" in stmt:
+                    # Check if table exists and has id column
+                    res = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='audit_logs'"))
+                    if res.fetchone():
+                        # Table exists, check if it works by trying a dummy insert
+                        try:
+                            conn.execute(text("INSERT INTO audit_logs (username, action, success) VALUES ('system', 'MIGRATE_CHECK', 1)"))
+                            conn.commit()
+                        except Exception:
+                            # Table is broken, drop and recreate
+                            conn.execute(text("DROP TABLE audit_logs"))
+                            conn.commit()
+                            conn.execute(text(stmt))
+                            conn.commit()
+                    else:
+                        conn.execute(text(stmt))
+                        conn.commit()
+                else:
+                    conn.execute(text(stmt))
+                    conn.commit()
             except Exception:
-                pass  # column already exists
+                pass  # column already exists or other safe error
 
 
 def _seed_users():

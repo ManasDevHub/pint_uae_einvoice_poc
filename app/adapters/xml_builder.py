@@ -12,7 +12,8 @@ def generate_ubl_xml(invoice: InvoicePayload) -> str:
          xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
          xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
     <cbc:CustomizationID>{invoice.specification_id}</cbc:CustomizationID>
-    <cbc:ProfileID>{invoice.business_process_id}</cbc:ProfileID>
+    <cbc:ProfileID>urn:peppol:bis:billing</cbc:ProfileID>
+    <cbc:ProfileExecutionID>{invoice.transaction_type_code or "10000000"}</cbc:ProfileExecutionID>
     <cbc:ID>{invoice.invoice_number}</cbc:ID>
     <cbc:IssueDate>{invoice.invoice_date}</cbc:IssueDate>
 """
@@ -24,9 +25,10 @@ def generate_ubl_xml(invoice: InvoicePayload) -> str:
 """
     
     # Seller
+    seller_scheme = "EM" if "@" in (invoice.seller.electronic_address or "") else (invoice.seller.electronic_scheme or "0235")
     xml += f"""    <cac:AccountingSupplierParty>
         <cac:Party>
-            <cbc:EndpointID schemeID="{invoice.seller.electronic_scheme}">{invoice.seller.electronic_address}</cbc:EndpointID>
+            <cbc:EndpointID schemeID="{seller_scheme}">{invoice.seller.electronic_address}</cbc:EndpointID>
             <cac:PartyName>
                 <cbc:Name>{invoice.seller.name}</cbc:Name>
             </cac:PartyName>
@@ -46,16 +48,20 @@ def generate_ubl_xml(invoice: InvoicePayload) -> str:
             </cac:PartyTaxScheme>
             <cac:PartyLegalEntity>
                 <cbc:RegistrationName>{invoice.seller.name}</cbc:RegistrationName>
-                <cbc:CompanyID schemeID="{invoice.seller.registration_identifier_type}">{invoice.seller.legal_registration}</cbc:CompanyID>
+                <cbc:CompanyID schemeID="0235">{invoice.seller.trn}</cbc:CompanyID>
             </cac:PartyLegalEntity>
+            <cac:Contact>
+                <cbc:ElectronicMail>{invoice.seller.electronic_address}</cbc:ElectronicMail>
+            </cac:Contact>
         </cac:Party>
     </cac:AccountingSupplierParty>
 """
 
     # Buyer
+    buyer_scheme = "EM" if "@" in (invoice.buyer.electronic_address or "") else (invoice.buyer.electronic_scheme or "0235")
     xml += f"""    <cac:AccountingCustomerParty>
         <cac:Party>
-            <cbc:EndpointID schemeID="{invoice.buyer.electronic_scheme}">{invoice.buyer.electronic_address}</cbc:EndpointID>
+            <cbc:EndpointID schemeID="{buyer_scheme}">{invoice.buyer.electronic_address}</cbc:EndpointID>
             <cac:PartyName>
                 <cbc:Name>{invoice.buyer.name}</cbc:Name>
             </cac:PartyName>
@@ -77,7 +83,11 @@ def generate_ubl_xml(invoice: InvoicePayload) -> str:
             </cac:PartyTaxScheme>
             <cac:PartyLegalEntity>
                 <cbc:RegistrationName>{invoice.buyer.name}</cbc:RegistrationName>
+                <cbc:CompanyID schemeID="0235">{invoice.buyer.trn or "AE0000000000000"}</cbc:CompanyID>
             </cac:PartyLegalEntity>
+            <cac:Contact>
+                <cbc:ElectronicMail>{invoice.buyer.electronic_address}</cbc:ElectronicMail>
+            </cac:Contact>
         </cac:Party>
     </cac:AccountingCustomerParty>
 """
@@ -93,6 +103,9 @@ def generate_ubl_xml(invoice: InvoicePayload) -> str:
     if invoice.payment_means_type_code:
         xml += f"""    <cac:PaymentMeans>
         <cbc:PaymentMeansCode>{invoice.payment_means_type_code}</cbc:PaymentMeansCode>
+        <cac:PayeeFinancialAccount>
+            <cbc:ID>{getattr(invoice.seller, 'bank_iban', 'AE000000000000000000000')}</cbc:ID>
+        </cac:PayeeFinancialAccount>
     </cac:PaymentMeans>
 """
 

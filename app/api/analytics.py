@@ -61,6 +61,7 @@ def _get_date_range(period: str, start_date: str = None, end_date: str = None):
         start = None
     return start, (end or now)
 
+@router.get("/analytics/summary")
 async def get_analytics_summary(
     request: Request,
     db: Session = Depends(get_db),
@@ -71,6 +72,7 @@ async def get_analytics_summary(
     try:
         tenant_id = getattr(request.state, "tenant_id", "anonymous")
         query = db.query(ValidationRun).filter(ValidationRun.tenant_id == tenant_id)
+        
         start, end = _get_date_range(period, start_date, end_date)
         if start:
             query = query.filter(ValidationRun.created_at >= start)
@@ -78,12 +80,11 @@ async def get_analytics_summary(
             query = query.filter(ValidationRun.created_at <= end)
 
         runs = query.all()
-
         total = len(runs)
+        
         valid_count = sum(1 for r in runs if r.is_valid)
         failed_count = total - valid_count
         pass_rate = (valid_count / total * 100) if total > 0 else 0
-
         category_counts = defaultdict(int)
         field_errors = defaultdict(int)
 
@@ -102,7 +103,12 @@ async def get_analytics_summary(
         date_counts = defaultdict(lambda: {"total": 0, "passed": 0})
 
         for run in runs:
-            run_date = run.created_at.date() if run.created_at else today
+            # Handle null created_at safely
+            run_dt = run.created_at
+            if not run_dt:
+                continue # Skip records without a timestamp for trend analysis
+            
+            run_date = run_dt.date()
             date_counts[run_date]["total"] += 1
             if run.is_valid:
                 date_counts[run_date]["passed"] += 1
@@ -114,16 +120,31 @@ async def get_analytics_summary(
             daily_pass_rate = (day_stats["passed"] / day_stats["total"] * 100) if day_stats["total"] > 0 else 0
             trend.append({"date": target_date.strftime("%a"), "pass_rate": round(daily_pass_rate, 1)})
 
-        latest_runs = [
-            {
-                "id": r.id,
-                "invoice_number": r.invoice_number,
-                "is_valid": r.is_valid,
-                "created_at": r.created_at,
-                "pass_percentage": r.pass_percentage
-            }
-            for r in sorted(runs, key=lambda x: x.created_at, reverse=True)[:5]
-        ]
+        # Safeguard sorting against malformed created_at
+        latest_runs_data = []
+        try:
+            valid_runs = [r for r in runs if r.created_at is not None]
+            sorted_runs = sorted(valid_runs, key=lambda x: x.created_at, reverse=True)[:5]
+            
+            latest_runs_data = [
+                {
+                    "id": r.id,
+                    "invoice_number": r.invoice_number,
+                    "is_valid": r.is_valid,
+                    "created_at": r.created_at.isoformat() if hasattr(r.created_at, 'isoformat') else str(r.created_at),
+                    "pass_percentage": r.pass_percentage
+                }
+                for r in sorted_runs
+            ]
+        except Exception as e:
+            # Fallback for sort failure
+            latest_runs_data = [
+                {
+                    "id": r.id, "invoice_number": r.invoice_number, "is_valid": r.is_valid, 
+                    "created_at": str(r.created_at), "pass_percentage": r.pass_percentage
+                } 
+                for r in runs[:5]
+            ]
 
         return {
             "total": total,
@@ -132,12 +153,18 @@ async def get_analytics_summary(
             "by_category": by_category,
             "trend": trend,
             "top_errors": top_errors,
-            "latest_runs": latest_runs,
+            "latest_runs": latest_runs_data,
             "period": period
         }
     except Exception as e:
-        traceback.print_exc()
-        return {"total": 0, "pass_rate": 0, "failures": 0, "by_category": [], "trend": [], "top_errors": [], "period": period}
+        import traceback
+        import logging
+        logging.getLogger("uvicorn.error").error(f"Analytics failure: {str(e)}", exc_info=True)
+        return {
+            "total": total if 'total' in locals() else 0, 
+            "pass_rate": 0, "failures": 0, "by_category": [], 
+            "trend": [], "top_errors": [], "latest_runs": [], "period": period
+        }
 
 @router.get("/analytics/rules")
 async def get_all_rules_with_stats(

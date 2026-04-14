@@ -16,6 +16,7 @@ class SellerDetails(BaseModel):
     registration_identifier_type: Optional[str] = Field(None, alias="seller_registration_identifier_type")
     tax_scheme_id: Optional[str] = Field("VAT", alias="seller_tax_scheme_id")
     postal_code: Optional[str] = Field(None, alias="seller_postal_code")
+    bank_iban: Optional[str] = Field(None, alias="seller_bank_iban")
 
 class BuyerDetails(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -82,6 +83,7 @@ class InvoicePayload(BaseModel):
     order_reference: Optional[str] = None
     payment_terms: Optional[str] = "Standard 30 Days"
     delivery_date: Optional[str] = None
+    buyer_reference: Optional[str] = None
     
     seller: SellerDetails = Field(default_factory=SellerDetails)
     buyer: BuyerDetails = Field(default_factory=BuyerDetails)
@@ -120,6 +122,7 @@ class InvoicePayload(BaseModel):
             "seller_legal_registration": self.seller.legal_registration,
             "seller_registration_identifier_type": self.seller.registration_identifier_type,
             "seller_tax_scheme_id": self.seller.tax_scheme_id,
+            "seller_bank_iban": self.seller.bank_iban,
 
             # Buyer Fields (A3)
             "buyer_name": self.buyer.name,
@@ -149,6 +152,7 @@ class InvoicePayload(BaseModel):
             "order_reference": self.order_reference,
             "payment_terms": self.payment_terms,
             "delivery_date": self.delivery_date,
+            "buyer_reference": self.buyer_reference,
             "seller_postal_code": self.seller.postal_code,
             "buyer_postal_code": self.buyer.postal_code,
 

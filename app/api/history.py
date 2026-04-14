@@ -60,7 +60,7 @@ async def get_history(
                 "is_valid": run.is_valid,
                 "total_errors": run.total_errors,
                 "pass_percentage": run.pass_percentage,
-                "created_at": run.created_at
+                "created_at": run.created_at.isoformat() if hasattr(run.created_at, 'isoformat') else str(run.created_at) if run.created_at else None
             }
             for run in runs
         ]
