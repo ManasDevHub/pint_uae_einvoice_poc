@@ -6,7 +6,7 @@ import time
 import re
 import pydantic
 from sqlalchemy.orm import Session
-from app.models.report import APIResponse
+from app.models.report import APIResponse, ValidationErrorItem
 from app.validation.validator import InvoiceValidator
 from app.adapters.generic_erp import GenericJSONAdapter
 from app.db.session import get_db
