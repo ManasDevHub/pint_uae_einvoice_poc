@@ -96,6 +96,15 @@ def generate_ubl_xml(invoice: InvoicePayload) -> str:
     </cac:AccountingCustomerParty>
 """
     
+    # Payment Details
+    xml += f"""    <cac:PaymentMeans>
+        <cbc:PaymentMeansCode>{invoice.payment_means_type_code or "30"}</cbc:PaymentMeansCode>
+    </cac:PaymentMeans>
+    <cac:PaymentTerms>
+        <cbc:Note>{invoice.payment_terms or "Standard 30 Days"}</cbc:Note>
+    </cac:PaymentTerms>
+"""
+
     # Tax Total
     xml += f"""    <cac:TaxTotal>
         <cbc:TaxAmount currencyID="{invoice.currency_code}">{fv(abs(invoice.totals.tax_amount))}</cbc:TaxAmount>

@@ -110,6 +110,7 @@ class RuleEngine:
 
                 elif rule == "valid_specification_id" and not is_empty:
                     valid_urns = [
+                        "urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0",
                         "urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:01:1.0",
                         "urn:peppol:pint:billing-1.0:ae:en:1.0"
                     ]

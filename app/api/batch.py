@@ -294,13 +294,13 @@ async def download_template():
     TEMPLATE_COLUMNS = [
         "specification_id", "business_process_id",
         "invoice_number", "invoice_date", "payment_due_date", "invoice_type_code",
-        "payment_means_type_code", "transaction_type", "transaction_type_code", "currency_code",
+        "payment_means_type_code", "payment_terms", "transaction_type", "transaction_type_code", "currency_code",
         "tax_category_code", "buyer_reference",
         "seller_name", "seller_trn", "seller_electronic_address", "seller_electronic_scheme", "seller_bank_iban", "seller_address", "seller_city", "seller_subdivision", "seller_country_code", 
         "seller_legal_registration", "seller_registration_identifier_type", "seller_tax_scheme_id",
         "buyer_name", "buyer_trn", "buyer_electronic_address", "buyer_electronic_scheme", "buyer_address", "buyer_city", "buyer_subdivision", "buyer_country_code",
         "buyer_legal_registration", "buyer_registration_identifier_type", "buyer_tax_scheme_id",
-        "line_id", "item_name", "unit_of_measure",
+        "line_id", "item_name", "item_description", "unit_of_measure",
         "quantity", "unit_price", "line_net_amount",
         "tax_category", "tax_rate", "tax_amount",
         "total_without_tax", "total_with_tax", "amount_due",
@@ -308,13 +308,14 @@ async def download_template():
     
     SAMPLE_ROWS = [
         {
-            "specification_id": "urn:peppol:pint:billing-1.0:ae:en:1.0",
+            "specification_id": "urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0",
             "business_process_id": "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0",
             "invoice_number": "INV-2026-001",
             "invoice_date": "2026-04-01",
             "payment_due_date": "2026-04-30",
             "invoice_type_code": "380",        
             "payment_means_type_code": "30",   
+            "payment_terms": "Standard 30 Days",
             "transaction_type": "B2B",
             "transaction_type_code": "10000000",
             "currency_code": "AED",
@@ -345,6 +346,7 @@ async def download_template():
             "buyer_tax_scheme_id": "VAT",
             "line_id": "1",
             "item_name": "Consulting Services",
+            "item_description": "General Consulting",
             "unit_of_measure": "EA",
             "quantity": 10,
             "unit_price": 500.00,
@@ -357,7 +359,7 @@ async def download_template():
             "amount_due": 5250.00,
         },
         {
-            "specification_id": "urn:peppol:pint:billing-1.0:ae:en:1.0",
+            "specification_id": "urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0",
             "business_process_id": "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0",
             "invoice_number": "INV-2026-002",
             "invoice_date": "2026-04-01",
