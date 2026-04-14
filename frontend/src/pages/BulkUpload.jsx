@@ -13,6 +13,7 @@ export default function BulkUpload() {
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(null)
   const [results, setResults] = useState([])
+  const [fullPipeline, setFullPipeline] = useState(false)
   const fileInputRef = useRef(null)
 
   const handleDrag = (e) => {
@@ -81,7 +82,7 @@ export default function BulkUpload() {
       // let the browser set it with the correct boundary.
       const { 'Content-Type': _, ...headersWithoutContentType } = API_HEADERS;
 
-      const res = await fetch(`${API_BASE}/api/v1/ingest-bulk`, {
+      const res = await fetch(`${API_BASE}/api/v1/ingest-bulk?full_pipeline=${fullPipeline}`, {
         method: 'POST',
         headers: headersWithoutContentType,
         body: form
@@ -146,7 +147,7 @@ export default function BulkUpload() {
       // Ensure we only send valid payloads
       const payloads = failedOnes.map(f => f.raw_payload)
       
-      const res = await fetch(`${API_BASE}/api/v1/batch-validate`, {
+      const res = await fetch(`${API_BASE}/api/v1/batch-validate?full_pipeline=${fullPipeline}`, {
         method: 'POST',
         headers: API_HEADERS,
         body: JSON.stringify(payloads)
@@ -178,7 +179,21 @@ export default function BulkUpload() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6">
         <Card className="p-6">
-          <h2 className="text-lg font-semibold text-[#1a2340] mb-4">Upload File</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-[#1a2340]">Upload File</h2>
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <span className="text-xs font-semibold text-[#5a6a85] group-hover:text-[#1a6fcf] transition-colors">Full Pipeline (Peppol API)</span>
+              <div className="relative inline-block w-8 h-4">
+                <input 
+                  type="checkbox" 
+                  className="peer opacity-0 w-0 h-0" 
+                  checked={fullPipeline}
+                  onChange={(e) => setFullPipeline(e.target.checked)}
+                />
+                <span className="absolute cursor-pointer inset-0 bg-[#e3eaf7] peer-checked:bg-[#22c55e] rounded-full transition-all before:content-[''] before:absolute before:h-3 before:w-3 before:left-0.5 before:bottom-0.5 before:bg-white before:rounded-full before:transition-all peer-checked:before:translate-x-4"></span>
+              </div>
+            </label>
+          </div>
           <div 
             className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
               isDragActive ? 'border-[#1a6fcf] bg-[#e8f1ff]' : 'border-[#e3eaf7] hover:border-[#8899b0] hover:bg-[#f8faff]'

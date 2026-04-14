@@ -15,7 +15,7 @@ validator = InvoiceValidator()
 
 @celery_app.task(name="app.etl.tasks.validate.validate_chunk", max_retries=3)
 def validate_chunk(job_id: str, chunk_idx: int, serialized_invoices: list,
-                   total_rows: int, pre_failed: int, tenant_id: str = "anonymous"):
+                   total_rows: int, pre_failed: int, tenant_id: str = "anonymous", full_pipeline: bool = False):
     """
     Stage 3: Validate — run all 51 PINT AE rules on each invoice in chunk.
     Passes validated results to load task.
@@ -30,6 +30,33 @@ def validate_chunk(job_id: str, chunk_idx: int, serialized_invoices: list,
 
             t0 = time.perf_counter()
             report = validator.validate(invoice)
+            
+            if full_pipeline and report.is_valid:
+                try:
+                    from app.adapters.xml_builder import generate_ubl_xml
+                    from app.validation.peppol_api import validate_with_peppol_api_sync, map_peppol_to_internal_errors, map_peppol_to_internal_warnings
+                    from app.models.report import ValidationErrorItem
+                    
+                    xml_content = generate_ubl_xml(invoice)
+                    peppol_res = validate_with_peppol_api_sync(xml_content)
+                    
+                    if peppol_res.get("status") == "invalid":
+                        peppol_errors = map_peppol_to_internal_errors(peppol_res)
+                        peppol_warnings = map_peppol_to_internal_warnings(peppol_res)
+                        
+                        report.errors.extend([ValidationErrorItem(**e) for e in peppol_errors])
+                        report.warnings.extend([ValidationErrorItem(**w) for w in peppol_warnings])
+                        report.is_valid = False
+                        report.total_errors = len(report.errors)
+                        
+                        # Re-calculate metrics
+                        total_peppol_fails = len(peppol_errors)
+                        report.metrics.failed_checks += total_peppol_fails
+                        report.metrics.passed_checks = max(0, report.metrics.total_checks - report.metrics.failed_checks)
+                        report.metrics.pass_percentage = round((report.metrics.passed_checks / report.metrics.total_checks) * 100, 2)
+                except Exception as peppol_err:
+                    log.error(f"Peppol API call failed in ETL: {peppol_err}")
+
             duration_ms = round((time.perf_counter() - t0) * 1000, 2)
 
             results.append({

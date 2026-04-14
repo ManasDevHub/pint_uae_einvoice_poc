@@ -43,6 +43,34 @@ async def validate_with_peppol_api(xml_payload: str | bytes) -> Dict[str, Any]:
             "warnings": []
         }
 
+def validate_with_peppol_api_sync(xml_payload: str | bytes) -> Dict[str, Any]:
+    """
+    Synchronous version of validate_with_peppol_api for use in Celery tasks.
+    """
+    url = "https://peppolvalidator.com/api/v1/validate"
+    headers = {"Content-Type": "application/xml"}
+    content = xml_payload if isinstance(xml_payload, bytes) else xml_payload.encode('utf-8')
+    
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post(url, content=content, headers=headers)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        logger.error(f"HTTPStatusError from peppolvalidator (sync): {exc.response.text}")
+        return {
+            "status": "error",
+            "errors": [{"rule": "API_ERROR", "message": f"Validator API returned {exc.response.status_code}: {exc.response.text}", "location": "/"}],
+            "warnings": []
+        }
+    except Exception as exc:
+        logger.error(f"Error calling peppolvalidator (sync): {exc}")
+        return {
+            "status": "error",
+            "errors": [{"rule": "NETWORK_ERROR", "message": f"Failed to contact Validator API: {str(exc)}", "location": "/"}],
+            "warnings": []
+        }
+
 def map_peppol_to_internal_errors(peppol_result: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Maps the generic Peppol Validator response into the internal ValidationErrorItem format.

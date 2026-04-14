@@ -14,7 +14,7 @@ CHUNK_SIZE = 50   # process 50 rows per Celery task — keeps memory low
 
 
 @celery_app.task(name="app.etl.tasks.transform.transform_batch", max_retries=3)
-def transform_batch(job_id: str, raw_rows: list, tenant_id: str = "anonymous"):
+def transform_batch(job_id: str, raw_rows: list, tenant_id: str = "anonymous", full_pipeline: bool = False):
     """
     Stage 2: Transform — adapter normalises raw rows to InvoicePayload.
     Splits into chunks and fans out to validate tasks.
@@ -68,7 +68,7 @@ def transform_batch(job_id: str, raw_rows: list, tenant_id: str = "anonymous"):
                 serialized_data.append((r_num, inv.model_dump(), raw))
             
             try:
-                validate_chunk(job_id, chunk_idx, serialized_data, len(raw_rows), len(row_errors), tenant_id=tenant_id)
+                validate_chunk(job_id, chunk_idx, serialized_data, len(raw_rows), len(row_errors), tenant_id=tenant_id, full_pipeline=full_pipeline)
             except Exception as e:
                 log.error(f"ETL Validation Stage failed: {e}")
                 # Fallback to direct call is already forced here

@@ -24,7 +24,7 @@ except Exception:
 
 batch_results: dict = {}
 
-async def _process_batch(batch_id: str, payloads: List[Dict], tenant_id: str = "anonymous"):
+async def _process_batch(batch_id: str, payloads: List[Dict], tenant_id: str = "anonymous", full_pipeline: bool = False):
     from app.validation.validator import InvoiceValidator
     from app.adapters.generic_erp import GenericJSONAdapter
     from app.adapters.ubl_xml import UBLXMLAdapter
@@ -56,9 +56,15 @@ async def _process_batch(batch_id: str, payloads: List[Dict], tenant_id: str = "
                     xml_payload = generate_ubl_xml(invoice)
                     
                 report = validator.validate(invoice)
-                peppol_res = await validate_with_peppol_api(xml_payload)
-                is_peppol_valid = peppol_res.get("status") == "valid"
-                peppol_errors = map_peppol_to_internal_errors(peppol_res)
+                
+                peppol_res = {}
+                is_peppol_valid = True
+                peppol_errors = []
+                
+                if full_pipeline:
+                    peppol_res = await validate_with_peppol_api(xml_payload)
+                    is_peppol_valid = peppol_res.get("status") == "valid"
+                    peppol_errors = map_peppol_to_internal_errors(peppol_res)
                 
                 final_validity = is_peppol_valid and report.is_valid
                 all_errors = [e.model_dump() if hasattr(e, 'model_dump') else e.__dict__ for e in report.errors] + peppol_errors
@@ -143,7 +149,7 @@ async def _process_batch(batch_id: str, payloads: List[Dict], tenant_id: str = "
         db.close()
 
 @router.post("/batch-validate")
-async def batch_validate(request: Request, payloads: List[Dict[str, Any]], background_tasks: BackgroundTasks):
+async def batch_validate(request: Request, payloads: List[Dict[str, Any]], background_tasks: BackgroundTasks, full_pipeline: bool = False):
     from app.main import limiter
     
     if len(payloads) > settings.max_batch_size:
@@ -156,7 +162,7 @@ async def batch_validate(request: Request, payloads: List[Dict[str, Any]], backg
     else:
         batch_results[batch_id] = initial_data
         
-    background_tasks.add_task(_process_batch, batch_id, payloads)
+    background_tasks.add_task(_process_batch, batch_id, payloads, tenant_id=getattr(request.state, "tenant_id", "anonymous"), full_pipeline=full_pipeline)
     return {"batch_id": batch_id, "status": "ACCEPTED", "total": len(payloads), "poll_url": f"/api/v1/batch-status/{batch_id}"}
 
 def map_excel_to_pint_ae(df) -> List[Dict]:
@@ -173,7 +179,7 @@ def map_excel_to_pint_ae(df) -> List[Dict]:
 @router.post("/ingest-bulk")
 @router.post("/upload-bulk")
 @router.post("/upload-excel")
-async def upload_bulk(request: Request, background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def upload_bulk(request: Request, background_tasks: BackgroundTasks, file: UploadFile = File(...), full_pipeline: bool = False):
     filename = file.filename.lower()
     if not any(filename.endswith(ext) for ext in ['.xlsx', '.xls', '.csv', '.xml', '.zip']):
         raise HTTPException(400, "Unsupported file format. Use Excel, CSV, XML, or ZIP of XMLs.")
@@ -199,10 +205,10 @@ async def upload_bulk(request: Request, background_tasks: BackgroundTasks, file:
             df = pd.read_excel(buf, dtype=str)
         
         payloads = map_excel_to_pint_ae(df)
-        background_tasks.add_task(_process_batch, batch_id, payloads, tenant_id=tenant_id)
+        background_tasks.add_task(_process_batch, batch_id, payloads, tenant_id=tenant_id, full_pipeline=full_pipeline)
 
     elif filename.endswith('.xml'):
-        background_tasks.add_task(_process_batch, batch_id, [contents], tenant_id=tenant_id)
+        background_tasks.add_task(_process_batch, batch_id, [contents], tenant_id=tenant_id, full_pipeline=full_pipeline)
 
     elif filename.endswith('.zip'):
         import zipfile
@@ -216,7 +222,7 @@ async def upload_bulk(request: Request, background_tasks: BackgroundTasks, file:
         
         if not xml_payloads:
             raise HTTPException(400, "No XML files found in ZIP (or all ignored due to batch limit)")
-        background_tasks.add_task(_process_batch, batch_id, xml_payloads, tenant_id=tenant_id)
+        background_tasks.add_task(_process_batch, batch_id, xml_payloads, tenant_id=tenant_id, full_pipeline=full_pipeline)
 
     # Return poll URL for backward compat with UI
     return {

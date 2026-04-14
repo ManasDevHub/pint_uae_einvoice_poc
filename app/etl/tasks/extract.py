@@ -45,7 +45,7 @@ def coerce_row(row: dict) -> dict:
 
 
 @celery_app.task(name="app.etl.tasks.extract.extract_excel", max_retries=3)
-def extract_excel(job_id: str, file_bytes_hex: str, filename: str, tenant_id: str = "anonymous"):
+def extract_excel(job_id: str, file_bytes_hex: str, filename: str, tenant_id: str = "anonymous", full_pipeline: bool = False):
     """
     Stage 1: Extract — parse Excel/CSV bytes into a list of row dicts.
     Returns list of raw row dicts to be picked up by transform task.
@@ -76,7 +76,7 @@ def extract_excel(job_id: str, file_bytes_hex: str, filename: str, tenant_id: st
         # Chain to transform with direct synchronous call
         try:
             from app.etl.tasks.transform import transform_batch
-            transform_batch(job_id, records, tenant_id=tenant_id)
+            transform_batch(job_id, records, tenant_id=tenant_id, full_pipeline=full_pipeline)
         except Exception as e:
             log.error(f"ETL Transform Stage failed: {e}")
             raise e
