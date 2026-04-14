@@ -91,7 +91,8 @@ class RuleEngine:
                         has_error_for_field = True
                         
                 elif rule == "trn_format" and not is_empty:
-                    if not re.match(r"^[0-9]{15}$", str(val)):
+                    # Allow optional AE prefix + 15 digits (Total 17 chars) or just 15 digits
+                    if not re.match(r"^(AE)?[0-9]{15}$", str(val)):
                         errors.append(ValidationErrorItem(field=field, error=message, severity=severity, category=category))
                         has_error_for_field = True
 
