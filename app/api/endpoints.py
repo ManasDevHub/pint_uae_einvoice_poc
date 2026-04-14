@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from typing import Dict, Any
 import hashlib
 import json
@@ -12,6 +12,8 @@ from app.adapters.generic_erp import GenericJSONAdapter
 from app.db.session import get_db
 from app.db.models import ValidationRun
 from app.core.config import settings
+from app.adapters.xml_builder import generate_ubl_xml
+from app.validation.peppol_api import validate_with_peppol_api, map_peppol_to_internal_errors, map_peppol_to_internal_warnings
 
 from app.core.logging import log
 from prometheus_client import Counter, Histogram
@@ -51,7 +53,12 @@ limiter = Limiter(key_func=get_tenant_key)
 
 @router.post("/validate-invoice", response_model=APIResponse)
 @limiter.limit(f"{settings.rate_limit_per_minute}/minute")
-def validate_invoice(request: Request, raw_payload: Dict[str, Any], db: Session = Depends(get_db)):
+async def validate_invoice(
+    request: Request, 
+    raw_payload: Dict[str, Any], 
+    full_pipeline: bool = Query(False),
+    db: Session = Depends(get_db)
+):
     t0 = time.perf_counter()
     tenant_id = getattr(request.state, "tenant_id", "anonymous")
     
@@ -83,12 +90,43 @@ def validate_invoice(request: Request, raw_payload: Dict[str, Any], db: Session 
         with VALIDATION_DURATION.time():
             report = validator.validate(invoice)
             
+            if full_pipeline and report.is_valid:
+                log.info(f"Full pipeline requested for {report.invoice_number}")
+                try:
+                    xml_content = generate_ubl_xml(invoice)
+                    peppol_res = await validate_with_peppol_api(xml_content)
+                    
+                    if peppol_res.get("status") == "invalid":
+                        # Map and merge external errors
+                        peppol_errors = map_peppol_to_internal_errors(peppol_res)
+                        peppol_warnings = map_peppol_to_internal_warnings(peppol_res)
+                        
+                        report.errors.extend([ValidationErrorItem(**e) for e in peppol_errors])
+                        report.warnings.extend([ValidationErrorItem(**w) for w in peppol_warnings])
+                        report.is_valid = False
+                        report.total_errors = len(report.errors)
+                        
+                        # Re-calculate metrics
+                        total_peppol_fails = len(peppol_errors)
+                        report.metrics.failed_checks += total_peppol_fails
+                        report.metrics.passed_checks = max(0, report.metrics.total_checks - report.metrics.failed_checks)
+                        report.metrics.pass_percentage = round((report.metrics.passed_checks / report.metrics.total_checks) * 100, 2)
+                        
+                except Exception as peppol_err:
+                    log.error(f"Peppol API call failed: {peppol_err}")
+                    report.warnings.append(ValidationErrorItem(
+                        field="PEPPOL_Validator",
+                        error=f"Full pipeline check reached error: {str(peppol_err)}",
+                        severity="MEDIUM",
+                        category="COMPLIANCE"
+                    ))
+                    
         if report.is_valid:
             status = "SUCCESS"
-            message = "Invoice is valid according to UAE PINT AE rules."
+            message = "Invoice is valid (Full Pipeline verified)." if full_pipeline else "Invoice is valid according to local UAE PINT AE rules."
         else:
             status = "FAILURE"
-            message = f"Found {report.total_errors} validation errors."
+            message = f"Found {report.total_errors} validation errors (Full Pipeline check)." if full_pipeline else f"Found {report.total_errors} validation errors."
             
         response_data = APIResponse(
             status=status,

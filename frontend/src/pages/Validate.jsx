@@ -14,6 +14,7 @@ export default function Validate() {
   const [history, setHistory] = useState([])
   const [lastAddedTimestamp, setLastAddedTimestamp] = useState(null)
 
+  const [fullPipeline, setFullPipeline] = useState(false)
   const { stages, results, error, isRunning, runPipeline, runSingle, reset } = useInvoiceApi()
 
   const addToHistory = useCallback((payloadStr, validateResult) => {
@@ -30,12 +31,12 @@ export default function Validate() {
   }, [])
 
   const handleRunSingle = async (endpoint) => {
-    await runSingle(endpoint, payload, apiKey)
+    await runSingle(endpoint, payload, apiKey, fullPipeline)
   }
 
   const wrappedRunAll = async () => {
     reset()
-    await runPipeline(payload, apiKey)
+    await runPipeline(payload, apiKey, fullPipeline)
   }
 
   useEffect(() => {
@@ -73,7 +74,21 @@ export default function Validate() {
         {/* Middle: Pipeline + Results */}
         <div className="flex flex-col gap-6">
           <div className="bg-white border border-[#e3eaf7] rounded-xl p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-[#8899b0] uppercase tracking-wider mb-4">Pipeline</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-sm font-semibold text-[#8899b0] uppercase tracking-wider">Pipeline</h2>
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <span className="text-xs font-semibold text-[#5a6a85] group-hover:text-[#1a6fcf] transition-colors">Full Pipeline (Peppol API)</span>
+                <div className="relative inline-block w-8 h-4">
+                  <input 
+                    type="checkbox" 
+                    className="peer opacity-0 w-0 h-0" 
+                    checked={fullPipeline}
+                    onChange={(e) => setFullPipeline(e.target.checked)}
+                  />
+                  <span className="absolute cursor-pointer inset-0 bg-[#e3eaf7] peer-checked:bg-[#22c55e] rounded-full transition-all before:content-[''] before:absolute before:h-3 before:w-3 before:left-0.5 before:bottom-0.5 before:bg-white before:rounded-full before:transition-all peer-checked:before:translate-x-4"></span>
+                </div>
+              </label>
+            </div>
             <PipelineRunner
               stages={stages}
               isRunning={isRunning}

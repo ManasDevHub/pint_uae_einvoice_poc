@@ -70,7 +70,7 @@ export function useInvoiceApi() {
     setIsRunning(false)
   }, [])
 
-  const runPipeline = useCallback(async (payload, apiKey) => {
+  const runPipeline = useCallback(async (payload, apiKey, fullPipeline = false) => {
     reset()
     setIsRunning(true)
     setError(null)
@@ -117,7 +117,8 @@ export function useInvoiceApi() {
     // Stage 1: Internal validate
     setStage('validate', 'loading')
     try {
-      const r = await apiFetch('/api/v1/validate-invoice', parsed, apiKey)
+      const url = '/api/v1/validate-invoice' + (fullPipeline ? '?full_pipeline=true' : '')
+      const r = await apiFetch(url, parsed, apiKey)
       setResult('validate', r)
       
       const isValid = r?.report?.is_valid
@@ -167,7 +168,7 @@ export function useInvoiceApi() {
     setIsRunning(false)
   }, [reset])
 
-  const runSingle = useCallback(async (endpoint, payload, apiKey) => {
+  const runSingle = useCallback(async (endpoint, payload, apiKey, fullPipeline = false) => {
     reset()
     setIsRunning(true)
     const key = endpoint === '/api/v1/validate-invoice' ? 'validate'
@@ -214,7 +215,10 @@ export function useInvoiceApi() {
 
     setStage(key, 'loading')
     try {
-      const r = await apiFetch(endpoint, parsed, apiKey)
+      const url = endpoint === '/api/v1/validate-invoice' && fullPipeline 
+        ? `${endpoint}?full_pipeline=true` 
+        : endpoint
+      const r = await apiFetch(url, parsed, apiKey)
       setResult(key, r)
       setStage(key, 'success')
     } catch (e) {
