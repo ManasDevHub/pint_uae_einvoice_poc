@@ -21,6 +21,9 @@ def generate_ubl_xml(invoice: InvoicePayload) -> str:
     <cbc:ID>{invoice.invoice_number}</cbc:ID>
     <cbc:IssueDate>{invoice.invoice_date}</cbc:IssueDate>
 """
+    if invoice.payment_due_date:
+        xml += f"    <cbc:DueDate>{invoice.payment_due_date}</cbc:DueDate>\n"
+    
     if is_credit_note:
         xml += f"    <cbc:CreditNoteTypeCode>{invoice.invoice_type_code}</cbc:CreditNoteTypeCode>\n"
     else:
@@ -29,7 +32,7 @@ def generate_ubl_xml(invoice: InvoicePayload) -> str:
     xml += f"    <cbc:DocumentCurrencyCode>{invoice.currency_code}</cbc:DocumentCurrencyCode>\n"
     
     # Requirement R003: Buyer Reference
-    xml += f"    <cbc:BuyerReference>{invoice.order_reference or 'NOT_PROVIDED'}</cbc:BuyerReference>\n"
+    xml += f"    <cbc:BuyerReference>{invoice.order_reference or invoice.buyer_reference or 'NOT_PROVIDED'}</cbc:BuyerReference>\n"
 
     # Seller
     seller_scheme = invoice.seller.electronic_scheme or ("EM" if "@" in (invoice.seller.electronic_address or "") else "0235")
