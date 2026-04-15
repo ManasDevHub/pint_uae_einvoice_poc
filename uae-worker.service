@@ -1,0 +1,18 @@
+[Unit]
+Description=UAE PINT AE Celery Worker
+After=network.target redis-server.service uae-invoice.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/uae_invoice
+Environment="PYTHONPATH=/home/ubuntu/uae_invoice"
+Environment="CELERY_BROKER_URL=redis://localhost:6379/0"
+Environment="DATABASE_URL=sqlite:////home/ubuntu/uae_invoice/uae_einvoice.db"
+ExecStart=/home/ubuntu/uae_invoice/venv/bin/celery -A app.etl.celery_app worker --loglevel=info --concurrency=2
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

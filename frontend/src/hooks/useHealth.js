@@ -9,9 +9,7 @@ export function useHealth() {
     
     async function check() {
       try {
-        const res = await fetch(`${API_BASE}/health/live`, {
-          headers: { 'ngrok-skip-browser-warning': 'true' }
-        })
+        const res = await fetch(`${API_BASE}/health/live`)
         if (mounted) setIsOnline(res.ok)
       } catch (e) {
         if (mounted) setIsOnline(false)

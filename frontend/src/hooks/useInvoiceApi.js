@@ -30,7 +30,6 @@ function parseAndDescribeJson(raw) {
 async function apiFetch(url, payload, apiKey) {
   const headers = { 
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': 'true'
   }
   if (apiKey) headers['X-API-Key'] = apiKey
 

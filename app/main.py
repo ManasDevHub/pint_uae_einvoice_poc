@@ -12,6 +12,8 @@ from app.api.history import router as history_router
 from app.api.analytics import router as analytics_router
 from app.api.auth_router import router as auth_router
 from app.api.reports import router as reports_router
+from app.api.integrations import router as integrations_router
+from app.api.api_keys import router as system_api_keys_router
 from app.core.config import settings
 from app.core.logging import RequestLoggingMiddleware, log
 from app.core.exceptions import validation_exception_handler, unhandled_exception_handler
@@ -73,7 +75,7 @@ async def add_security_headers(request: Request, call_next):
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "img-src 'self' data: https://fastapi.tiangolo.com; "
-        "connect-src 'self' http://localhost:8000 https://*.ngrok-free.dev;"
+        "connect-src 'self' http://localhost:8000;"
     )
     return response
 
@@ -81,7 +83,6 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173", 
-        "https://erasable-contributively-jann.ngrok-free.dev",
         "http://52.66.111.65:8000",
         "http://52.66.111.65"
     ],
@@ -103,12 +104,17 @@ async def api_key_auth(request: Request, call_next):
     path = request.url.path
     
     # Exempt routes that use JWT/Session auth or are public
-    exempt_prefixes = {"/assets", "/docs", "/openapi.json", "/health", "/metrics", "/auth"}
+    exempt_prefixes = {"/assets", "/docs", "/openapi.json", "/health", "/metrics", "/auth", "/api/v1/system"}
     exempt_exact = {"/", "/favicon.svg", "/icons.svg"}
 
     if path in exempt_exact or any(path.startswith(p) for p in exempt_prefixes):
         return await call_next(request)
         
+    # Standard Web UI uses 'Authorization: Bearer <token>'
+    # If this header is present, we allow the request to pass to the router-level auth
+    if request.headers.get("Authorization"):
+        return await call_next(request)
+
     # Only enforce X-API-Key for actual integration endpoints
     if not (path.startswith("/api") or path.startswith("/asp")):
         return await call_next(request)
@@ -124,11 +130,22 @@ async def api_key_auth(request: Request, call_next):
     tenant_id = VALID_KEYS.get(hashed)
 
     if not tenant_id:
-        # Fallback to timing-safe if dict lookup fails (optional, dict lookup is O(1))
-        for h_key, t_id in VALID_KEYS.items():
-            if secrets.compare_digest(h_key, hashed):
-                tenant_id = t_id
-                break
+        # Check DB for dynamic keys
+        from app.db.session import SessionLocal
+        from app.db.models import SystemApiKey
+        db = SessionLocal()
+        try:
+            db_key = db.query(SystemApiKey).filter(
+                SystemApiKey.hashed_key == hashed,
+                SystemApiKey.is_active == True
+            ).first()
+            if db_key:
+                tenant_id = db_key.tenant_id
+                # Update last used
+                db_key.last_used_at = __import__("datetime").datetime.now()
+                db.commit()
+        finally:
+            db.close()
 
     if not tenant_id:
         return JSONResponse(status_code=403, content={"status": "FAILURE", "message": "Invalid API key"})
@@ -157,6 +174,8 @@ app.include_router(history_router, prefix="/api/v1", tags=["History API"])
 app.include_router(analytics_router, prefix="/api/v1", tags=["Analytics API"])
 app.include_router(reports_router, prefix="/api/v1", tags=["Reports API"])
 app.include_router(mock_router, prefix="/asp/v1", tags=["ASP Mock Simulation"])
+app.include_router(integrations_router, prefix="/api/v1/integrations", tags=["ERP Integrations"])
+app.include_router(system_api_keys_router, prefix="/api/v1/system", tags=["System API Keys"])
 
 # ── Serve React build ──
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")

@@ -23,7 +23,6 @@ def validate_chunk(job_id: str, chunk_idx: int, serialized_invoices: list,
     db = SessionLocal()
     try:
         results = []
-        tenant_id = None
 
         for row_num, invoice_dict, raw_payload in serialized_invoices:
             invoice = InvoicePayload(**invoice_dict)

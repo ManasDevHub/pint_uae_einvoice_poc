@@ -7,7 +7,6 @@ export async function downloadCsv(url, filename = 'export.csv') {
     const res = await fetch(url, {
       headers: {
         'X-API-Key': 'demo-key-123',
-        'ngrok-skip-browser-warning': 'true',
       },
     })
 
@@ -35,5 +34,4 @@ export async function downloadCsv(url, filename = 'export.csv') {
 export const API_HEADERS = {
   'Content-Type': 'application/json',
   'X-API-Key': 'demo-key-123',
-  'ngrok-skip-browser-warning': 'true',
 }

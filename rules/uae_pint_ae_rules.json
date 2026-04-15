@@ -349,6 +349,13 @@
             "severity": "MEDIUM",
             "category": "FORMAT",
             "message": "A7.1: Delivery Date must follow YYYY-MM-DD if provided."
+        },
+        {
+            "field": "item_description",
+            "rules": ["required"],
+            "severity": "MEDIUM",
+            "category": "COMPLIANCE",
+            "message": "A6.12: Item Description is mandatory for clear audit trails."
         }
     ]
 }

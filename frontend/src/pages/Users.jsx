@@ -32,7 +32,6 @@ export default function Users() {
       const res = await fetch(`${API_BASE}/auth/users`, {
         headers: { 
           'Authorization': `Bearer ${getToken()}`,
-          'ngrok-skip-browser-warning': 'true'
         }
       })
       if (!res.ok) throw new Error('Failed to fetch users')
@@ -49,7 +48,6 @@ export default function Users() {
       const res = await fetch(`${API_BASE}/auth/audit-log?limit=50`, {
         headers: { 
           'Authorization': `Bearer ${getToken()}`,
-          'ngrok-skip-browser-warning': 'true'
         }
       })
       if (res.ok) setAuditLog(await res.json())
@@ -80,7 +78,6 @@ export default function Users() {
         headers: { 
           'Authorization': `Bearer ${getToken()}`, 
           'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
         },
         body: JSON.stringify(body)
       })
@@ -103,7 +100,6 @@ export default function Users() {
         method: 'DELETE',
         headers: { 
           'Authorization': `Bearer ${getToken()}`,
-          'ngrok-skip-browser-warning': 'true'
         }
       })
       if (!res.ok) {
@@ -130,7 +126,6 @@ export default function Users() {
         headers: { 
           'Authorization': `Bearer ${getToken()}`, 
           'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
         },
         body: JSON.stringify(newUser)
       })

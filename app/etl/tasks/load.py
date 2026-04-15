@@ -87,7 +87,11 @@ def load_chunk(job_id: str, chunk_idx: int, results: list,
                 job.status       = ETLJobStatus.COMPLETE.value if job.failed_rows == 0 else ETLJobStatus.PARTIAL.value
                 job.completed_at = datetime.now(timezone.utc)
                 if job.started_at:
-                    delta = (job.completed_at - job.started_at).total_seconds() * 1000
+                    # Handle SQLite potential naive datetimes
+                    s_at = job.started_at
+                    if s_at.tzinfo is None:
+                        s_at = s_at.replace(tzinfo=timezone.utc)
+                    delta = (job.completed_at - s_at).total_seconds() * 1000
                     job.duration_ms = round(delta, 2)
                 
                 # Sync to Redis for UI
@@ -113,7 +117,6 @@ def load_chunk(job_id: str, chunk_idx: int, results: list,
         try:
             job = db2.query(ETLJob).filter(ETLJob.id == job_id).first()
             if job:
-                from datetime import datetime, timezone
                 job.status = ETLJobStatus.FAILED.value
                 job.error_message = f"Load phase failed at chunk {chunk_idx}: {str(exc)}"
                 job.completed_at = datetime.now(timezone.utc)

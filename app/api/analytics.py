@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from app.db.session import get_db
-from app.db.models import ValidationRun
+from app.db.models import ValidationRun, ASPSubmissionLog, ETLJob
 import datetime
 import traceback
 import io
@@ -146,6 +146,23 @@ async def get_analytics_summary(
                 for r in runs[:5]
             ]
 
+        # ASP Performance Metrics
+        asp_latency_avg = 0
+        asp_success_rate = 0
+        latest_asp_trend = []
+        
+        asp_logs = db.query(ASPSubmissionLog).filter(ASPSubmissionLog.tenant_id == tenant_id)
+        if start:
+            asp_logs = asp_logs.filter(ASPSubmissionLog.submitted_at >= start)
+        
+        logs = asp_logs.all()
+        if logs:
+            latencies = [l.latency_ms for l in logs if l.latency_ms is not None]
+            asp_latency_avg = round(sum(latencies) / len(latencies), 2) if latencies else 0
+            
+            cleared = sum(1 for l in logs if l.status == "cleared")
+            asp_success_rate = round((cleared / len(logs)) * 100, 1) if logs else 0
+
         return {
             "total": total,
             "pass_rate": round(pass_rate, 1),
@@ -154,7 +171,12 @@ async def get_analytics_summary(
             "trend": trend,
             "top_errors": top_errors,
             "latest_runs": latest_runs_data,
-            "period": period
+            "period": period,
+            "asp_metrics": {
+                "average_latency_ms": asp_latency_avg,
+                "submission_success_rate": asp_success_rate,
+                "total_submissions": len(logs)
+            }
         }
     except Exception as e:
         import traceback

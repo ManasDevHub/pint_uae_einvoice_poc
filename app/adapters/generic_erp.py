@@ -170,39 +170,54 @@ class GenericJSONAdapter(BaseERPAdapter):
 
         # 5. Handle Lines (Extreme robustness)
         lines = []
-        if isinstance(data_copy.get("lines"), list):
-            # If line is already a dict, keep it as is (Pydantic will validate)
-            lines = data_copy["lines"]
-        else:
-            # Try to build at least one line from flat keys
-            item = get_val("item_name", get_val("description", get_val("item", "")))
-            qty = safe_float(get_val("quantity", get_val("qty", 0)))
-            price = safe_float(get_val("unit_price", get_val("price", 0)))
+        raw_lines = data_copy.get("lines")
+
+        # Define internal normalization for lines
+        def normalize_line(l_row: dict, idx: int = 1) -> dict:
+            l_lookup = {self._normalize_key(k): v for k, v in l_row.items()}
+            def get_lk(fuzzy: str, default: Any = None) -> Any:
+                target = self._normalize_key(fuzzy)
+                if target in l_lookup: return l_lookup[target]
+                for k, v in l_lookup.items():
+                    if target in k and not isinstance(v, dict): return v
+                return default
+
+            item = get_lk("item_name", get_lk("description", get_lk("item", "")))
+            qty = safe_float(get_lk("quantity", get_lk("qty", 0)))
+            price = safe_float(get_lk("unit_price", get_lk("price", 0)))
+            rate = safe_float(get_lk("tax_rate", get_lk("line_tax_rate", 0.05)))
+            if rate > 1: rate = rate / 100 
             
-            if item or qty > 0 or price > 0:
-                rate = safe_float(get_val("tax_rate", get_val("line_tax_rate", 0.05)))
-                if rate > 1: rate = rate / 100 
-                net_amount = safe_float(get_val("line_net_amount", get_val("net_amount", qty * price)))
-                tax_amount = safe_float(get_val("tax_amount", get_val("line_tax_amount", net_amount * rate)))
-                
-                # A6 Mandatory Fields
-                lines.append({
-                    "line_id": str(get_val("line_id", "1")),
-                    "item_name": item if item else "Consulting Services",
-                    "item_description": str(get_val("item_description", get_val("description", item))),
-                    "unit_of_measure": str(get_val("unit_of_measure", get_val("uom", "EA"))),
-                    "quantity": qty if qty > 0 else 1.0,
-                    "unit_price": price,
-                    "gross_price": safe_float(get_val("gross_price", get_val("item_gross_price", price))),
-                    "price_base_quantity": safe_float(get_val("price_base_quantity", 1.0)),
-                    "discount_amount": safe_float(get_val("discount_amount", 0.0)),
-                    "line_net_amount": net_amount,
-                    "tax_category": str(get_val("tax_category", get_val("line_tax_category", "S"))),
-                    "tax_rate": rate,
-                    "tax_amount": tax_amount,
-                    "vat_line_amount_aed": safe_float(get_val("vat_line_amount_aed", tax_amount)),
-                    "line_amount_aed": safe_float(get_val("line_amount_aed", net_amount))
-                })
+            net_amount = safe_float(get_lk("line_net_amount", get_lk("net_amount", qty * price)))
+            tax_amount = safe_float(get_lk("tax_amount", get_lk("line_tax_amount", net_amount * rate)))
+
+            return {
+                "line_id": str(get_lk("line_id", str(idx))),
+                "item_name": str(item) if item else "Consulting Services",
+                "item_description": str(get_lk("item_description", get_lk("description", item))),
+                "unit_of_measure": str(get_lk("unit_of_measure", get_lk("uom", "EA"))),
+                "quantity": qty if qty > 0 else 1.0,
+                "unit_price": price,
+                "gross_price": safe_float(get_lk("gross_price", get_lk("item_gross_price", price))),
+                "price_base_quantity": safe_float(get_lk("price_base_quantity", 1.0)),
+                "discount_amount": safe_float(get_lk("discount_amount", 0.0)),
+                "line_net_amount": net_amount,
+                "tax_category": str(get_lk("tax_category", get_lk("line_tax_category", "S"))),
+                "tax_rate": rate,
+                "tax_amount": tax_amount,
+                "vat_line_amount_aed": safe_float(get_lk("vat_line_amount_aed", tax_amount)),
+                "line_amount_aed": safe_float(get_lk("line_amount_aed", net_amount))
+            }
+
+        if isinstance(raw_lines, list):
+            for i, l in enumerate(raw_lines):
+                if isinstance(l, dict):
+                    lines.append(normalize_line(l, i+1))
+        else:
+            # Fallback for flat row
+            line = normalize_line(data_copy, 1)
+            if line["item_name"] or line["quantity"] > 0:
+                lines.append(line)
         
         norm_data["lines"] = lines
 
@@ -225,9 +240,9 @@ class GenericJSONAdapter(BaseERPAdapter):
             tax_amount = safe_float(get_val("tax_amount", 0))
             
             if total_without_tax == 0 and lines:
-                total_without_tax = sum(line.get("line_net_amount", 0) for line in lines) if isinstance(lines[0], dict) else 0
+                total_without_tax = sum(line.get("line_net_amount", 0) for line in lines)
             if tax_amount == 0 and lines:
-                tax_amount = sum(line.get("tax_amount", 0) for line in lines) if isinstance(lines[0], dict) else 0
+                tax_amount = sum(line.get("tax_amount", 0) for line in lines)
                 
             norm_data["totals"] = {
                 "line_extension_amount": total_without_tax,

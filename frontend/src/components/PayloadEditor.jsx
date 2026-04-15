@@ -35,11 +35,17 @@ export default function PayloadEditor({ value, onChange, apiKey, onApiKeyChange,
     if (!validationErrors.length) return []
     const lines = value.split('\n')
     return validationErrors.map(err => {
-      // Find the first line that contains the field key
       const fieldKey = err.field
-      const index = lines.findIndex(l => l.includes(`"${fieldKey}"`))
-      return { line: index + 1, field: fieldKey, msg: err.error }
-    }).filter(e => e.line > 0)
+      // Look for exactly "key": (handling potential whitespace)
+      const keyPattern = new RegExp(`"${fieldKey}"\\s*:`)
+      const index = lines.findIndex(l => keyPattern.test(l))
+      
+      return { 
+        line: index >= 0 ? index + 1 : null, 
+        field: fieldKey, 
+        msg: err.error 
+      }
+    }).filter(e => e.line !== null)
   }, [validationErrors, value])
 
   return (
@@ -131,12 +137,13 @@ export default function PayloadEditor({ value, onChange, apiKey, onApiKeyChange,
         </div>
         
         <textarea
-          className="json-editor flex-1 w-full font-mono text-[13px] leading-[22px] bg-transparent relative z-10 resize-none p-4"
-          style={{ minHeight: 0, color: 'inherit' }}
+          className="json-editor flex-1 w-full font-mono text-[13px] leading-[22px] bg-transparent relative z-10 resize-none p-4 whitespace-pre overflow-x-auto"
+          style={{ minHeight: 0, color: 'inherit', whiteSpace: 'pre', overflowWrap: 'normal' }}
           value={value}
           onChange={e => handleChange(e.target.value)}
           spellCheck={false}
           autoComplete="off"
+          wrap="off"
         />
         
         {jsonError && (
