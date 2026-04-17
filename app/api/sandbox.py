@@ -176,8 +176,7 @@ async def download_sandbox_template():
     """Download a professional Excel (.xlsx) template with the 51 mandatory PINT AE fields."""
     import io
     from openpyxl import Workbook
-    from openpyxl.responses import StreamingResponse
-    from fastapi.responses import StreamingResponse as FastAPIStreamingResponse
+    from fastapi.responses import StreamingResponse
     
     wb = Workbook()
     ws = wb.active
@@ -212,7 +211,7 @@ async def download_sandbox_template():
     wb.save(stream)
     stream.seek(0)
     
-    return FastAPIStreamingResponse(
+    return StreamingResponse(
         stream,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="PINT_AE_Sandbox_Template.xlsx"'}
