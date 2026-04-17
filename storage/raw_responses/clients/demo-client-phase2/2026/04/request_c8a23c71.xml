@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+             xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+             xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+    <cbc:CustomizationID>urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0</cbc:CustomizationID>
+    <cbc:ProfileID>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</cbc:ProfileID>
+    <cbc:ID>INV-2026-AE-001</cbc:ID>
+    <cbc:IssueDate>2026-04-01</cbc:IssueDate>
+    <cbc:DueDate>2026-04-30</cbc:DueDate>
+    <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>
+    <cbc:DocumentCurrencyCode>AED</cbc:DocumentCurrencyCode>
+    <cbc:BuyerReference>NOT_PROVIDED</cbc:BuyerReference>
+    <cac:AccountingSupplierParty>
+        <cac:Party>
+            <cbc:EndpointID schemeID="0235">accounts@adamas-tech.ae</cbc:EndpointID>
+            <cac:PartyName>
+                <cbc:Name>Adamas Tech Consulting LLC</cbc:Name>
+            </cac:PartyName>
+            <cac:PostalAddress>
+                <cbc:StreetName>Dubai Internet City</cbc:StreetName>
+                <cbc:CityName>Dubai</cbc:CityName>
+                <cbc:CountrySubentity>DU</cbc:CountrySubentity>
+                <cac:Country>
+                    <cbc:IdentificationCode>AE</cbc:IdentificationCode>
+                </cac:Country>
+            </cac:PostalAddress>
+            <cac:PartyTaxScheme>
+                <cbc:CompanyID>100200300400500</cbc:CompanyID>
+                <cac:TaxScheme>
+                    <cbc:ID>VAT</cbc:ID>
+                </cac:TaxScheme>
+            </cac:PartyTaxScheme>
+            <cac:PartyLegalEntity>
+                <cbc:RegistrationName>Adamas Tech Consulting LLC</cbc:RegistrationName>
+                <cbc:CompanyID schemeID="0235">100200300400500</cbc:CompanyID>
+            </cac:PartyLegalEntity>
+        </cac:Party>
+    </cac:AccountingSupplierParty>
+    <cac:AccountingCustomerParty>
+        <cac:Party>
+            <cbc:EndpointID schemeID="0235">finance@gulftrade.ae</cbc:EndpointID>
+            <cac:PartyName>
+                <cbc:Name>Gulf Trading FZE</cbc:Name>
+            </cac:PartyName>
+            <cac:PostalAddress>
+                <cbc:StreetName>Abu Dhabi, UAE</cbc:StreetName>
+                <cbc:CityName>Abu Dhabi</cbc:CityName>
+                <cbc:CountrySubentity>AZ</cbc:CountrySubentity>
+                <cac:Country>
+                    <cbc:IdentificationCode>AE</cbc:IdentificationCode>
+                </cac:Country>
+            </cac:PostalAddress>
+            <cac:PartyTaxScheme>
+                <cbc:CompanyID>100999888777666</cbc:CompanyID>
+                <cac:TaxScheme>
+                    <cbc:ID>VAT</cbc:ID>
+                </cac:TaxScheme>
+            </cac:PartyTaxScheme>
+            <cac:PartyLegalEntity>
+                <cbc:RegistrationName>Gulf Trading FZE</cbc:RegistrationName>
+                <cbc:CompanyID schemeID="0235">100999888777666</cbc:CompanyID>
+            </cac:PartyLegalEntity>
+        </cac:Party>
+    </cac:AccountingCustomerParty>
+    <cac:PaymentMeans>
+        <cbc:PaymentMeansCode>30</cbc:PaymentMeansCode>
+    </cac:PaymentMeans>
+    <cac:PaymentTerms>
+        <cbc:Note>Standard 30 Days</cbc:Note>
+    </cac:PaymentTerms>
+    <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="AED">250.00</cbc:TaxAmount>
+        <cac:TaxSubtotal>
+            <cbc:TaxableAmount currencyID="AED">5000.00</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="AED">250.00</cbc:TaxAmount>
+            <cac:TaxCategory>
+                <cbc:ID>S</cbc:ID>
+                <cbc:Percent>5.00</cbc:Percent>
+                <cac:TaxScheme>
+                    <cbc:ID>VAT</cbc:ID>
+                </cac:TaxScheme>
+            </cac:TaxCategory>
+        </cac:TaxSubtotal>
+    </cac:TaxTotal>
+    <cac:LegalMonetaryTotal>
+        <cbc:LineExtensionAmount currencyID="AED">5000.00</cbc:LineExtensionAmount>
+        <cbc:TaxExclusiveAmount currencyID="AED">5000.00</cbc:TaxExclusiveAmount>
+        <cbc:TaxInclusiveAmount currencyID="AED">5250.00</cbc:TaxInclusiveAmount>
+        <cbc:PayableAmount currencyID="AED">5250.00</cbc:PayableAmount>
+    </cac:LegalMonetaryTotal>
+    <cac:InvoiceLine>
+        <cbc:ID>1</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="EA">10.0</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="AED">5000.00</cbc:LineExtensionAmount>
+        <cac:Item>
+            <cbc:Name>ERP Consulting Services</cbc:Name>
+            <cac:ClassifiedTaxCategory>
+                <cbc:ID>S</cbc:ID>
+                <cbc:Percent>5.00</cbc:Percent>
+                <cac:TaxScheme>
+                    <cbc:ID>VAT</cbc:ID>
+                </cac:TaxScheme>
+            </cac:ClassifiedTaxCategory>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="AED">500.00</cbc:PriceAmount>
+        </cac:Price>
+    </cac:InvoiceLine>
+</Invoice>

@@ -40,10 +40,10 @@ export default function Topbar() {
         <div className="bg-[#e8f1ff] text-[#1a6fcf] text-xs font-semibold px-2 py-1 rounded-full">
           PINT AE v1.0
         </div>
-        <button className="text-[#5a6a85] hover:text-[#1a6fcf] transition-colors relative">
+        {/* <button className="text-[#5a6a85] hover:text-[#1a6fcf] transition-colors relative">
           <Bell className="w-5 h-5" />
           <span className="absolute top-0 right-0 w-2 h-2 bg-[#e53e3e] rounded-full border border-white" />
-        </button>
+        </button> */}
 
         {/* User menu */}
         <div className="relative">

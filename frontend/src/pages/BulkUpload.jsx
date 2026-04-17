@@ -58,10 +58,15 @@ export default function BulkUpload() {
         if (res.ok) {
           const data = await res.json()
           setProgress(data)
-          if (data.status === 'COMPLETE') {
+          if (data.status === 'COMPLETE' || data.status === 'FAILED') {
             clearInterval(interval)
             setUploading(false)
-            setResults(data.results || [])
+            if (data.status === 'COMPLETE') {
+              setResults(data.results || [])
+            } else {
+              toast.error(data.error_message || "Processing failed. Please check your template format.", { duration: 6000 })
+              setProgress(null)
+            }
           }
         } else if (res.status === 404) {
           // May take a bit to register
