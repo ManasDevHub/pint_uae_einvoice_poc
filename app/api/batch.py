@@ -300,6 +300,24 @@ async def upload_bulk(
 
     from app.db.models import ETLJob, ETLJobStatus
     from app.etl.tasks.extract import extract_excel
+    import pandas as pd
+
+    # Immediate validation of format to prevent "Processing" hangs
+    try:
+        buf = io.BytesIO(contents)
+        if filename.endswith(".csv"):
+            df = pd.read_csv(buf, nrows=5, dtype=str, encoding='utf-8-sig')
+        else:
+            df = pd.read_excel(buf, nrows=5, dtype=str)
+        
+        df.columns = [str(c).strip().lower().replace(" ", "_") for c in df.columns]
+        mandatory = ["invoice_number", "invoice_date", "seller_trn", "buyer_name"]
+        missing = [m for m in mandatory if m not in df.columns]
+        if missing:
+            raise ValueError("Invalid template format. Please download and use the professional PINT AE Template.")
+    except Exception as e:
+        log.warning(f"Immediate validation failed for {filename}: {e}")
+        raise HTTPException(400, f"Invalid Template: {str(e)}")
 
     db = SessionLocal()
     try:

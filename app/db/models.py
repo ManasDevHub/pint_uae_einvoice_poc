@@ -326,6 +326,8 @@ class TestRun(Base):
     start_time      = Column(DateTime(timezone=True), server_default=func.now())
     end_time        = Column(DateTime(timezone=True), nullable=True)
     execution_time_ms = Column(Float,      nullable=True)
+    current_stage   = Column(String(50),  nullable=True) # INGESTION / ANALYSIS / VALIDATION / FINALIZATION
+    progress_percent = Column(Float,       default=0.0)
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
 
     results = relationship("TestRunResult", back_populates="test_run", cascade="all, delete-orphan")

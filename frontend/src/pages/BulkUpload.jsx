@@ -101,14 +101,24 @@ export default function BulkUpload() {
         headers: headersWithoutContentType,
         body: form
       })
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) {
+        // Stop spinner for 400 errors (Template Validation Failures)
+        const errorText = await res.text();
+        setUploading(false);
+        setProgress(null);
+        toast.error(`Template Rejected: ${JSON.parse(errorText).detail || 'Invalid Format'}`, { 
+          duration: 8000,
+          style: { border: '2px solid #e53e3e', padding: '16px', fontWeight: 'bold' }
+        });
+        return;
+      }
       const data = await res.json()
       pollStatus(data.batch_id)
     } catch (e) {
       console.error(e)
       setUploading(false)
-      setProgress(null) // Clear progress on fatal error
-      toast.error("Format Error: " + e.message, { duration: 6000 })
+      setProgress(null)
+      toast.error("Upload Error: " + e.message, { duration: 6000 })
     }
   }
 

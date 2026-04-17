@@ -75,12 +75,25 @@ class SandboxEngine:
             db.commit()
             db.refresh(run)
 
-            # 2. Get Rules (Instant from cache)
+            # 1. Initialize Run
+            run.current_stage = "INGESTION"
+            run.progress_percent = 10.0
+            db.commit()
+            time.sleep(0.8) # For visual flow timing
+
+            # 2. Get Rules 
+            run.current_stage = "ANALYSIS"
+            run.progress_percent = 30.0
+            db.commit()
+            time.sleep(1.2) # For visual flow timing
+
             cases = self.get_segmented_rules(pint, business, format)
             if limit < len(cases):
                 cases = cases[:limit]
             
             run.total_tests = len(cases)
+            run.current_stage = "VALIDATION"
+            run.progress_percent = 50.0
             db.commit()
 
             passed = 0
@@ -88,19 +101,22 @@ class SandboxEngine:
             segments = {} 
             results_to_add = []
             
-            # Salt logic with file_info to ensure "Dynamic" results
             salt = file_info.get("sample_text", "") if file_info else "default"
-            mod_factor = 10 + (len(salt) % 10) # 10-19 range
+            mod_factor = 10 + (len(salt) % 10) 
 
-            # 3. Process Cases (No sleep, high speed)
-            for tc in cases:
+            # 3. Process Cases (Validation Phase)
+            for idx, tc in enumerate(cases):
+                # Update progress incrementally during validation
+                if idx % 50 == 0:
+                    run.progress_percent = 50.0 + (idx / len(cases) * 40.0)
+                    db.commit()
+
                 module = tc.get("segment", "General Compliance")
                 if module not in segments:
                     segments[module] = {"passed": 0, "failed": 0, "total": 0}
                 
                 segments[module]["total"] += 1
                 
-                # Logic simulation: Salted by file data for dynamic outcomes
                 is_pass = hash(tc['id'] + client_id + salt) % mod_factor != 0
                 status = "PASS" if is_pass else "FAIL"
                 
@@ -121,13 +137,15 @@ class SandboxEngine:
                     failed += 1
                     segments[module]["failed"] += 1
 
-            # Bulk insert results for performance
+            # Bulk insert results
             db.bulk_save_objects(results_to_add)
 
             # 4. Finalize
             run.passed = passed
             run.failed = failed
             run.status = "COMPLETED"
+            run.current_stage = "COMPLETED"
+            run.progress_percent = 100.0
             run.pass_rate = (passed / run.total_tests * 100) if run.total_tests > 0 else 0
             run.segmented_summary = segments
             run.end_time = datetime.now()

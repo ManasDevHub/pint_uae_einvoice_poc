@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FileText, History, Settings, Users, BarChart2, ShieldCheck, Database, Zap, Globe, Cpu, CheckCircle, Upload, PieChart, FileBarChart2, Server, ChevronDown, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, FileText, History, Settings, Users, BarChart2, ShieldCheck, ShieldHalf, Database, Zap, Globe, Cpu, CheckCircle, Upload, PieChart, FileBarChart2, Server, ChevronDown, ChevronRight } from 'lucide-react'
 import { useHealth } from '../../hooks/useHealth'
 
 export default function Sidebar() {
@@ -71,7 +71,7 @@ export default function Sidebar() {
             className="w-full flex items-center justify-between px-2 py-2 mb-1 text-[#8899b0] hover:text-[#1a2340] transition-colors"
           >
             <div className="flex items-center gap-3">
-              <Zap className="w-5 h-5 text-[#1a6fcf]" />
+              <ShieldHalf className="w-5 h-5 text-[#1a6fcf]" />
               <span className="text-xs font-bold uppercase tracking-wider">PINT Validator</span>
             </div>
             {pintOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}

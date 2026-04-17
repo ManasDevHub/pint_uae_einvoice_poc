@@ -333,40 +333,54 @@ export default function Sandbox() {
         <div className="py-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-12">
-               <div className="flex flex-col items-center gap-4 group">
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 relative z-10 animate-pulse">
+               {/* Ingestion Block */}
+               <div className={`flex flex-col items-center gap-4 transition-all duration-500 ${!currentRun?.current_stage || currentRun?.current_stage === 'INGESTION' ? 'opacity-100 scale-110' : 'opacity-40'}`}>
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg transition-all ${!currentRun?.current_stage || currentRun?.current_stage === 'INGESTION' ? 'bg-emerald-500 text-white shadow-emerald-500/20 animate-pulse' : 'bg-slate-100 text-slate-400'}`}>
                     <FileText className="w-8 h-8" />
                   </div>
                   <div className="text-center">
                     <div className="text-xs font-black text-[#1a2340] uppercase tracking-wider">Ingestion</div>
-                    <div className="text-[10px] font-bold text-[#8899b0]">Scanning File...</div>
+                    <div className="text-[10px] font-bold text-[#8899b0]">{currentRun?.current_stage === 'INGESTION' ? 'Scanning File...' : 'Verified'}</div>
                   </div>
                </div>
+               
                <div className="h-px flex-1 bg-slate-200 mx-4 relative top-[-24px]">
-                 <div className="h-full bg-emerald-500 animate-progress-fast w-0" />
+                 <div className={`h-full bg-emerald-500 transition-all duration-1000 ${currentRun?.progress_percent > 10 ? 'w-full' : 'w-0'}`} />
                </div>
-               <div className="flex flex-col items-center gap-4 opacity-50">
-                  <div className="w-16 h-16 rounded-2xl bg-[#1a2340] text-white flex items-center justify-center shadow-lg shadow-[#1a2340]/20 relative z-10">
+
+               {/* Analysis Block */}
+               <div className={`flex flex-col items-center gap-4 transition-all duration-500 ${currentRun?.current_stage === 'ANALYSIS' ? 'opacity-100 scale-110' : currentRun?.progress_percent > 30 ? 'opacity-40' : 'opacity-20'}`}>
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg transition-all ${currentRun?.current_stage === 'ANALYSIS' ? 'bg-blue-500 text-white shadow-blue-500/20 animate-pulse' : 'bg-slate-100 text-slate-400'}`}>
                     <Activity className="w-8 h-8" />
                   </div>
                   <div className="text-center">
                     <div className="text-xs font-black text-[#1a2340] uppercase tracking-wider">Analysis</div>
-                    <div className="text-[10px] font-bold text-[#8899b0]">Matching Rules...</div>
+                    <div className="text-[10px] font-bold text-[#8899b0]">{currentRun?.current_stage === 'ANALYSIS' ? 'Matching Rules...' : currentRun?.progress_percent > 30 ? 'Matched' : 'Pending'}</div>
                   </div>
                </div>
-               <div className="h-px flex-1 bg-slate-200 mx-4 relative top-[-24px]"></div>
-               <div className="flex flex-col items-center gap-4 opacity-30">
-                  <div className="w-16 h-16 rounded-2xl bg-[#1a2340] text-white flex items-center justify-center shadow-lg shadow-[#1a2340]/20 relative z-10">
+
+               <div className="h-px flex-1 bg-slate-200 mx-4 relative top-[-24px]">
+                 <div className={`h-full bg-blue-500 transition-all duration-1000 ${currentRun?.progress_percent > 40 ? 'w-full' : 'w-0'}`} />
+               </div>
+
+               {/* Validation Block */}
+               <div className={`flex flex-col items-center gap-4 transition-all duration-500 ${currentRun?.current_stage === 'VALIDATION' ? 'opacity-100 scale-110' : currentRun?.progress_percent > 80 ? 'opacity-40' : 'opacity-20'}`}>
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg transition-all ${currentRun?.current_stage === 'VALIDATION' ? 'bg-indigo-500 text-white shadow-indigo-500/20 animate-bounce-subtle' : 'bg-slate-100 text-slate-400'}`}>
                     <ShieldCheck className="w-8 h-8" />
                   </div>
                   <div className="text-center">
                     <div className="text-xs font-black text-[#1a2340] uppercase tracking-wider">Validation</div>
-                    <div className="text-[10px] font-bold text-[#8899b0]">Simulating PINT AE...</div>
+                    <div className="text-[10px] font-bold text-[#8899b0]">{currentRun?.current_stage === 'VALIDATION' ? 'Simulating PINT AE...' : currentRun?.progress_percent > 80 ? 'Validated' : 'Pending'}</div>
                   </div>
                </div>
-               <div className="h-px flex-1 bg-slate-200 mx-4 relative top-[-24px]"></div>
-               <div className="flex flex-col items-center gap-4 opacity-20">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center border-2 border-dashed border-slate-200">
+
+               <div className="h-px flex-1 bg-slate-200 mx-4 relative top-[-24px]">
+                 <div className={`h-full bg-indigo-500 transition-all duration-1000 ${currentRun?.progress_percent > 90 ? 'w-full' : 'w-0'}`} />
+               </div>
+
+               {/* Results Block (Final) */}
+               <div className={`flex flex-col items-center gap-4 transition-all duration-500 ${currentRun?.current_stage === 'COMPLETED' ? 'opacity-100 scale-110' : 'opacity-20'}`}>
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg transition-all ${currentRun?.current_stage === 'COMPLETED' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 border-2 border-dashed border-slate-200'}`}>
                     <CheckCircle2 className="w-8 h-8" />
                   </div>
                   <div className="text-center">
@@ -382,11 +396,21 @@ export default function Sandbox() {
                 <Loader2 className="w-12 h-12 text-[#1a2340] animate-spin relative z-10 mx-auto" />
               </div>
               <div>
-                <h3 className="text-xl font-black text-[#1a2340] animate-pulse">Processing Validation Suite</h3>
-                <p className="text-sm font-medium text-[#5a6a85] mt-2">Running PINT Rules (51), Business Logic (432), and Format Scans (85)</p>
+                <h3 className="text-xl font-black text-[#1a2340] animate-pulse">
+                  {currentRun?.current_stage === 'INGESTION' ? 'Ingesting Dataset...' : 
+                   currentRun?.current_stage === 'ANALYSIS' ? 'Analyzing Rule Sets...' :
+                   currentRun?.current_stage === 'VALIDATION' ? 'Executing Compliance Simulation...' :
+                   'Finalizing Results...'}
+                </h3>
+                <p className="text-sm font-medium text-[#5a6a85] mt-2">
+                  {currentRun?.current_stage === 'VALIDATION' ? `Processing ${currentRun?.total || 568} PINT AE Test Cases...` : 'Initializing Sandbox environment...'}
+                </p>
               </div>
               <div className="max-w-md mx-auto">
-                <ProgressBar progress={45} className="h-2 rounded-full" />
+                <ProgressBar progress={currentRun?.progress_percent || 10} className="h-2 rounded-full" />
+                <div className="mt-2 text-[10px] font-bold text-[#8899b0] uppercase tracking-widest">
+                  Progress: {Math.round(currentRun?.progress_percent || 10)}%
+                </div>
               </div>
             </div>
           </div>
