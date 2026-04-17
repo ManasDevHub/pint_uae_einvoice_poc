@@ -95,7 +95,8 @@ export default function BulkUpload() {
     } catch (e) {
       console.error(e)
       setUploading(false)
-      alert("Upload failed: " + e.message)
+      setProgress(null) // Clear progress on fatal error
+      toast.error("Format Error: " + e.message, { duration: 6000 })
     }
   }
 
@@ -293,7 +294,7 @@ export default function BulkUpload() {
           <div className="p-4 border-b border-[#e3eaf7] flex justify-between items-center">
             <h2 className="text-lg font-semibold text-[#1a2340]">Validation Results</h2>
             <div className="flex gap-2 ml-auto">
-              {validResultsCount > 0 && !uploading && (
+              {validResultsCount > 0 && !hasFailures && !uploading && (
                 <Button 
                   variant="primary" 
                   disabled={isSubmitting} 

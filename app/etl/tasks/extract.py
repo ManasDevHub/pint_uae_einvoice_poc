@@ -108,6 +108,12 @@ def extract_excel(job_id: str, file_bytes_hex: str, filename: str, tenant_id: st
         df = df.fillna("")
         df.columns = [str(c).strip().lower().replace(" ", "_") for c in df.columns]
         
+        # 1. Validate mandatory columns
+        mandatory = ["invoice_number", "invoice_date", "seller_trn", "buyer_name"]
+        missing = [m for m in mandatory if m not in df.columns]
+        if missing:
+            raise ValueError(f"Wrong format data. Missing required columns: {', '.join(missing)}")
+
         raw_records = df.to_dict("records")
         # 1. Clean data (coercion, TRN padding)
         cleaned_records = [coerce_row(r) for r in raw_records]

@@ -145,7 +145,8 @@ export function useInvoiceApi() {
     try {
       const r = await apiFetch('/asp/v1/validate', parsed, apiKey)
       setResult('asp', r)
-      setStage('asp', r?.asp_status === 'ACCEPTED' ? 'success' : 'error')
+      const aspStatus = (r?.asp_status || "").toUpperCase()
+      setStage('asp', aspStatus === 'ACCEPTED' ? 'success' : 'error')
     } catch (e) {
       setStage('asp', 'error')
       setError(e.message)

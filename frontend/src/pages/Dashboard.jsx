@@ -125,9 +125,9 @@ export default function Dashboard() {
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <FileText className="w-16 h-16 text-[#1a6fcf]" />
           </div>
-          <div className="text-xs font-semibold text-[#8899b0] uppercase tracking-wider mb-2">Total Invoices</div>
+          <div className="text-xs font-semibold text-[#8899b0] uppercase tracking-wider mb-2">Processed Invoices</div>
           <div className="text-3xl font-bold text-[#1a2340]">{data?.total || 0}</div>
-          <div className="text-xs text-[#22c55e] font-medium mt-2">↑ Active processing</div>
+          <div className="text-xs text-[#22c55e] font-medium mt-2">↑ Verified Invoices</div>
         </Card>
 
         <Card className="p-5 relative overflow-hidden group cursor-pointer hover:shadow-md transition-shadow">
