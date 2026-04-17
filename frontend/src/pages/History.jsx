@@ -7,6 +7,7 @@ import { API_BASE } from '../constants/api'
 import { downloadCsv, API_HEADERS } from '../constants/apiHelpers'
 import DateRangeFilter from '../components/ui/DateRangeFilter'
 import toast from 'react-hot-toast'
+import { Send, RefreshCw } from 'lucide-react'
 
 export default function History() {
   const [runs, setRuns] = useState([])
@@ -55,6 +56,27 @@ export default function History() {
       toast.success('CSV downloaded successfully')
     } catch (e) {
       toast.error(`Export failed: ${e.message}`)
+    }
+  }
+
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSendSingleToASP = async (invoiceNumber) => {
+    setIsSubmitting(true)
+    const t = toast.loading(`Sending Invoice #${invoiceNumber} to ASP...`)
+    try {
+      const res = await fetch(`${API_BASE}/asp/v1/submit-validated?source_module=History%20Module&source_filename=history_export.json`, {
+        method: 'POST',
+        headers: API_HEADERS,
+        body: JSON.stringify([invoiceNumber])
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      toast.success(`Invoice #${invoiceNumber} successfully sent to ASP Portal!`, { id: t })
+    } catch (e) {
+      toast.error(`ASP Submission failed: ${e.message}`, { id: t })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -120,6 +142,7 @@ export default function History() {
                 <th className="px-6 py-3 font-medium">Status</th>
                 <th className="px-6 py-3 font-medium">Errors</th>
                 <th className="px-6 py-3 font-medium">Pass %</th>
+                <th className="px-6 py-3 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e3eaf7]">
@@ -158,6 +181,18 @@ export default function History() {
                   </td>
                   <td className="px-6 py-4 font-semibold text-[#1a2340]">
                     {run.pass_percentage ?? 100}%
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    {run.is_valid && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleSendSingleToASP(run.invoice_number); }}
+                        disabled={isSubmitting}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#f0f7ff] text-[#1a6fcf] rounded-lg text-xs font-bold hover:bg-[#1a6fcf] hover:text-white transition-all shadow-sm"
+                      >
+                        {isSubmitting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                        Send to ASP
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

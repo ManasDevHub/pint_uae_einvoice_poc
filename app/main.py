@@ -14,8 +14,13 @@ from app.api.auth_router import router as auth_router
 from app.api.reports import router as reports_router
 from app.api.integrations import router as integrations_router
 from app.api.api_keys import router as system_api_keys_router
+from app.api.enterprise_analytics import router as enterprise_analytics_router
+from app.api.qa_studio import router as qa_studio_router
+from app.api.audit import router as audit_router
+from app.api.sandbox import router as sandbox_router
 from app.core.config import settings
 from app.core.logging import RequestLoggingMiddleware, log
+from app.core.scheduler import start_scheduler
 from app.core.exceptions import validation_exception_handler, unhandled_exception_handler
 from app.db.session import init_db
 import hashlib
@@ -99,6 +104,11 @@ VALID_KEYS = {
     for k in settings.api_keys.split(",") if k
 }
 
+@app.on_event("startup")
+async def startup_event():
+    log.info("Application starting up...")
+    start_scheduler()
+
 @app.middleware("http")
 async def api_key_auth(request: Request, call_next):
     path = request.url.path
@@ -176,6 +186,10 @@ app.include_router(reports_router, prefix="/api/v1", tags=["Reports API"])
 app.include_router(mock_router, prefix="/asp/v1", tags=["ASP Mock Simulation"])
 app.include_router(integrations_router, prefix="/api/v1/integrations", tags=["ERP Integrations"])
 app.include_router(system_api_keys_router, prefix="/api/v1/system", tags=["System API Keys"])
+app.include_router(enterprise_analytics_router, prefix="/api/v1/enterprise", tags=["Enterprise Analytics"])
+app.include_router(qa_studio_router, prefix="/api/v1/qa", tags=["QA Studio"])
+app.include_router(audit_router, prefix="/api/v1/audit", tags=["Enterprise Audit"])
+app.include_router(sandbox_router, prefix="/api/v1/sandbox", tags=["PINT AE Sandbox"])
 
 # ── Serve React build ──
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")

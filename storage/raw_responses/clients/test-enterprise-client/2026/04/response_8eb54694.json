@@ -1,0 +1,12 @@
+{
+  "submissionId": "fd2f8210-cb10-4a0e-838f-e065a7620f40",
+  "status": "Rejected",
+  "timestamp": "2026-04-16T07:38:00.788035",
+  "errors": [
+    {
+      "code": "PINT-AE-01",
+      "message": "Simulated rejection for testing purpose",
+      "xpath": "//cbc:ID"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, CheckCircle, Upload, History, PieChart, Server, Settings, Users, FileBarChart2 } from 'lucide-react'
+import { LayoutDashboard, FileText, History, Settings, Users, BarChart2, ShieldCheck, Database, Zap, Globe, Cpu, CheckCircle, Upload, PieChart, FileBarChart2, Server } from 'lucide-react'
 import { useHealth } from '../../hooks/useHealth'
 
 export default function Sidebar() {
@@ -13,10 +13,13 @@ export default function Sidebar() {
     { label: "Run history", path: "/history", icon: History },
     { label: "Analytics", path: "/analytics", icon: PieChart },
     { label: "Reports", path: "/reports", icon: FileBarChart2 },
+    { icon: ShieldCheck, label: 'ASP Portal', path: '/audit-portal' },
+    { icon: Database, label: 'PINT AE Sandbox', path: '/sandbox' },
   ]
 
   const sysItems = [
     { label: "ERP integrations", path: "/integrations", icon: Server },
+    { icon: Zap, label: 'ERP Analytics', path: '/erp-analytics' },
     { label: "Settings", path: "/settings", icon: Settings },
     { label: "User management", path: "/users", icon: Users },
   ]

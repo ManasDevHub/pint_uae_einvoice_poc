@@ -173,17 +173,26 @@ async def test_connection(conn_id: str, request: Request, db: Session = Depends(
 def _test_sftp(conn: ERPConnection) -> dict:
     try:
         import paramiko
+        import io
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        # SFTP auth would go here
+        
+        private_key = None
+        if conn.encrypted_credentials:
+            import json
+            creds = json.loads(conn.encrypted_credentials)
+            if creds.get("sftp_private_key"):
+                key_io = io.StringIO(creds["sftp_private_key"])
+                private_key = paramiko.RSAKey.from_private_key(key_io)
+
         ssh.connect(conn.sftp_host, port=conn.sftp_port,
-                    username=conn.sftp_username, timeout=10)
+                    username=conn.sftp_username, pkey=private_key, timeout=10)
         sftp = ssh.open_sftp()
         files = sftp.listdir(conn.sftp_path or "/")
         sftp.close(); ssh.close()
-        return {"status": "ok", "message": f"SFTP connected. {len(files)} files found."}
+        return {"status": "ok", "message": f"Enterprise SFTP connected via RSA. {len(files)} files found."}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": f"Connection Failed: {str(e)}"}
 
 
 # ── Inbound webhook receiver (Model 5) ───────────────────────────────────
@@ -204,6 +213,7 @@ async def receive_webhook(
 
     body_bytes = await request.body()
 
+    # 1. HMAC Signature Verification
     if conn.webhook_secret and x_webhook_signature:
         expected = hmac.new(
             conn.webhook_secret.encode(),
@@ -212,7 +222,12 @@ async def receive_webhook(
         ).hexdigest()
         sig = x_webhook_signature.replace("sha256=", "")
         if not hmac.compare_digest(expected, sig):
-            raise HTTPException(401, "Invalid webhook signature")
+            raise HTTPException(401, "Invalid webhook signature (HMAC-SHA256)")
+
+    # 2. RSA/JWT Verification (Optional Advanced Layer)
+    if conn.integration_mode == "webhook" and conn.auth_type == "jwt":
+        # Placeholder for Jose-based JWT token verification header
+        pass
 
     try:
         payload = json.loads(body_bytes)

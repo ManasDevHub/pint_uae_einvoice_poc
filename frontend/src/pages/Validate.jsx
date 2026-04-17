@@ -5,6 +5,9 @@ import ValidationReport from '../components/ValidationReport'
 import SessionHistory from '../components/SessionHistory'
 import { useInvoiceApi } from '../hooks/useInvoiceApi'
 import { SAMPLES, DEMO_API_KEY } from '../constants/samplePayloads'
+import toast from 'react-hot-toast'
+import { API_BASE } from '../constants/api'
+import { API_HEADERS } from '../constants/apiHelpers'
 
 const DEFAULT_PAYLOAD = JSON.stringify(SAMPLES.b2b.payload, null, 2)
 
@@ -15,7 +18,8 @@ export default function Validate() {
   const [lastAddedTimestamp, setLastAddedTimestamp] = useState(null)
 
   const [fullPipeline, setFullPipeline] = useState(false)
-  const { stages, results, error, isRunning, runPipeline, runSingle, reset } = useInvoiceApi()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { stages, results, error, isRunning, runPipeline, runSingle, reset, setResults } = useInvoiceApi()
 
   const addToHistory = useCallback((payloadStr, validateResult) => {
     if (!validateResult?.report) return
@@ -37,6 +41,38 @@ export default function Validate() {
   const wrappedRunAll = async () => {
     reset()
     await runPipeline(payload, apiKey, fullPipeline)
+  }
+
+  const handleSendToASP = async () => {
+    let parsed
+    try { parsed = JSON.parse(payload) } catch { return toast.error("Invalid JSON payload") }
+
+    setIsSubmitting(true)
+    const t = toast.loading("Pushing to ASP Integration Portal...")
+    try {
+      // Use the invoice number from the validation results if available, otherwise from parsed payload
+      const invNum = results.validate?.report?.invoice_number || parsed.invoice_number || "Unknown"
+      
+      const res = await fetch(`${API_BASE}/asp/v1/submit?client_id=demo-client-phase2&source_module=Manual%20Workspace&source_filename=manual_entry.json`, {
+        method: 'POST',
+        headers: API_HEADERS,
+        body: JSON.stringify(parsed)
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      toast.success(`Invoice #${invNum} cleared by ASP and logged in Audit Portal`, { id: t })
+      
+      // Update results UI to show the ASP/FTA status
+      setResults(prev => ({
+        ...prev,
+        asp: { status: "ACCEPTED", asp_reference: data.fta_reference }, 
+        submit: { status: "CLEARED", clearance_id: data.clearance_id }
+      }))
+    } catch (e) {
+      toast.error("ASP Submission failed: " + e.message, { id: t })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   useEffect(() => {
@@ -100,7 +136,13 @@ export default function Validate() {
 
           <div className="bg-white border border-[#e3eaf7] rounded-xl p-5 shadow-sm flex-1">
             <h2 className="text-sm font-semibold text-[#8899b0] uppercase tracking-wider mb-4">Results</h2>
-            <ValidationReport stages={stages} results={results} error={error} />
+            <ValidationReport 
+              stages={stages} 
+              results={results} 
+              error={error} 
+              onSendToASP={handleSendToASP}
+              isSubmitting={isSubmitting}
+            />
           </div>
         </div>
 

@@ -238,3 +238,114 @@ class SystemApiKey(Base):
     __table_args__ = (
         Index("ix_syskey_tenant", "tenant_id"),
     )
+# ── Advanced Enterprise Analytics & Submission Tracking ───────────────────
+
+class ClientSubmission(Base):
+    """SECTION 1.A: Master capture of every ASP submission and response."""
+    __tablename__ = "client_submissions"
+
+    submission_id       = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    client_id           = Column(String(100), nullable=False, index=True)
+    invoice_id          = Column(String(100), nullable=True) # internal ID from validation_runs
+    invoice_number      = Column(String(100), nullable=False, index=True)
+    seller_trn          = Column(String(20),  nullable=True)
+    buyer_trn           = Column(String(20),  nullable=True)
+    invoice_type_code   = Column(String(10),  nullable=True)
+    currency_code       = Column(String(5),   nullable=True)
+    total_amount        = Column(Float,        nullable=True)
+    asp_provider        = Column(String(100), default="UAE-ASP-GATEWAY")
+    submission_timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    http_status_code    = Column(Integer,     nullable=True)
+    overall_status      = Column(String(30),  default="Pending") # Accepted, Rejected, Pending, Error, Duplicate
+    response_time_ms    = Column(Float,       nullable=True)
+    raw_response_path   = Column(String(500), nullable=True) # S3/Local path reference
+    raw_request_path    = Column(String(500), nullable=True) # S3/Local path for XML invoice
+    source_filename     = Column(String(255), nullable=True) # e.g. "batch_upload.xlsx"
+    source_module       = Column(String(100), nullable=True) # e.g. "Bulk Upload", "Manual Workspace"
+    created_at          = Column(DateTime(timezone=True), server_default=func.now())
+
+    validation_errors = relationship("SubmissionValidationError", back_populates="submission", cascade="all, delete-orphan")
+    field_metrics     = relationship("SubmissionFieldMetric", back_populates="submission", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_sub_client_status", "client_id", "overall_status"),
+        Index("ix_sub_client_date",   "client_id", "submission_timestamp"),
+    )
+
+
+class SubmissionValidationError(Base):
+    """SECTION 1.B: Granular capture of errors returned by the ASP/FTA."""
+    __tablename__ = "submission_validation_errors"
+
+    id                  = Column(Integer, primary_key=True, autoincrement=True)
+    submission_id       = Column(String(36), ForeignKey("client_submissions.submission_id", ondelete="CASCADE"), nullable=False, index=True)
+    error_code          = Column(String(100), nullable=True)
+    error_message       = Column(Text,        nullable=False)
+    severity            = Column(String(20),  default="error") # error/warning
+    rule_reference      = Column(String(100), nullable=True) # BR-xx / PINT-AE-xx
+    xpath_location      = Column(String(500), nullable=True)
+    created_at          = Column(DateTime(timezone=True), server_default=func.now())
+
+    submission = relationship("ClientSubmission", back_populates="validation_errors")
+
+
+class SubmissionFieldMetric(Base):
+    """SECTION 1.C: Matrix of field presence/validity for the Heatmap feature."""
+    __tablename__ = "submission_field_metrics"
+
+    id                  = Column(Integer, primary_key=True, autoincrement=True)
+    submission_id       = Column(String(36), ForeignKey("client_submissions.submission_id", ondelete="CASCADE"), nullable=False, index=True)
+    client_id           = Column(String(100), nullable=False, index=True)
+    field_name          = Column(String(100), nullable=False)
+    is_present          = Column(Boolean,     default=True)
+    is_valid            = Column(Boolean,     default=True)
+    created_at          = Column(DateTime(timezone=True), server_default=func.now())
+
+    submission = relationship("ClientSubmission", back_populates="field_metrics")
+
+    __table_args__ = (
+        Index("ix_field_client_name", "client_id", "field_name"),
+    )
+
+
+class TestRun(Base):
+    """SECTION 3: Header for grouping QA automation test batches."""
+    __tablename__ = "test_runs"
+
+    id              = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    client_id       = Column(String(100), nullable=False, index=True)
+    run_type        = Column(String(20),  default="full") # smoke / full / custom
+    status          = Column(String(20),  default="RUNNING") # RUNNING / COMPLETED / FAILED
+    total_tests     = Column(Integer,     default=0)
+    passed          = Column(Integer,     default=0)
+    failed          = Column(Integer,     default=0)
+    skipped         = Column(Integer,     default=0)
+    pass_rate       = Column(Float,       default=0.0)
+    rule_selection  = Column(JSON,        nullable=True) # e.g. {"pint": true, "business": true}
+    segmented_summary = Column(JSON,      nullable=True) # e.g. {"Tax": {"p": 5, "f": 0}, ...}
+    start_time      = Column(DateTime(timezone=True), server_default=func.now())
+    end_time        = Column(DateTime(timezone=True), nullable=True)
+    execution_time_ms = Column(Float,      nullable=True)
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+
+    results = relationship("TestRunResult", back_populates="test_run", cascade="all, delete-orphan")
+
+
+class TestRunResult(Base):
+    """SECTION 1.D: Individual test case results from the 558-case repository."""
+    __tablename__ = "test_run_results"
+
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    run_id          = Column(String(36), ForeignKey("test_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    client_id       = Column(String(100), nullable=False, index=True)
+    test_case_id    = Column(String(50),  nullable=False, index=True)
+    submission_id   = Column(String(36),  nullable=True) # link to submission if executed E2E
+    expected_result = Column(String(20),  nullable=True) # Accept / Reject
+    actual_result   = Column(String(20),  nullable=True)
+    status          = Column(String(10),  nullable=False) # PASS / FAIL
+    error_codes     = Column(JSON,        nullable=True) # actual error codes received
+    input_payload   = Column(Text,        nullable=True) # stores the mutated XML
+    execution_time_ms = Column(Float,      nullable=True)
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+
+    test_run = relationship("TestRun", back_populates="results")

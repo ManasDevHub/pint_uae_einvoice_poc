@@ -30,8 +30,17 @@ export async function downloadCsv(url, filename = 'export.csv') {
   }
 }
 
-/** Standard headers for all API fetch() calls */
-export const API_HEADERS = {
-  'Content-Type': 'application/json',
-  'X-API-Key': 'demo-key-123',
+/** Standard headers for all API fetch() and axios calls */
+export const getApiHeaders = (token = null) => {
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'demo-key-123', // Development fallback
+  }
+  // Only add Bearer if token is a valid non-empty string
+  if (token && typeof token === 'string' && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  return headers
 }
+
+export const API_HEADERS = getApiHeaders()

@@ -1,7 +1,7 @@
-import { AlertCircle, CheckCircle2, ChevronRight, Hash, Building2, User, ShoppingCart, Calculator, Lock } from 'lucide-react'
+import { AlertCircle, CheckCircle2, ChevronRight, Hash, Building2, User, ShoppingCart, Calculator, Lock, Send, RefreshCw as LucideRefresh } from 'lucide-react'
 import Pill from './ui/Pill'
 
-export default function ValidationReport({ stages, results, error }) {
+export default function ValidationReport({ stages, results, error, onSendToASP, isSubmitting }) {
   const vResult = results.validate?.report
   const aspResult = results.asp
   const ftaResult = results.submit
@@ -160,7 +160,6 @@ export default function ValidationReport({ stages, results, error }) {
               { label: 'Status', val: aspResult?.status || 'IDLE' },
               { label: 'Invoice #', val: vResult.invoice_number || '—' },
               { label: 'Reference', val: aspResult?.asp_reference || '—' },
-              { label: 'Validated at', val: aspResult ? new Date().toLocaleTimeString() : '—' },
             ].map(r => (
               <div key={r.label} className="flex justify-between text-[11px] py-1 border-b border-black/5 last:border-0">
                 <span className="text-[#8899b0] font-medium">{r.label}</span>
@@ -168,6 +167,16 @@ export default function ValidationReport({ stages, results, error }) {
               </div>
             ))}
           </div>
+          {vResult.is_valid && !aspResult && (
+            <button 
+              onClick={onSendToASP}
+              disabled={isSubmitting}
+              className="w-full mt-4 py-2 bg-[#1a6fcf] text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-[#1559a7] transition-all flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? <LucideRefresh size={12} className="animate-spin" /> : <Send size={12} />}
+              Push to ASP Integration
+            </button>
+          )}
         </div>
 
         {/* FTA Card */}

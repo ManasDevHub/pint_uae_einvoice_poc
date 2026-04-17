@@ -47,6 +47,11 @@ def _sqlite_migrate():
             "ALTER TABLE users ADD COLUMN last_login DATETIME",
             "ALTER TABLE validation_runs ADD COLUMN seller_trn TEXT",
             "ALTER TABLE validation_runs ADD COLUMN transaction_type TEXT",
+            "ALTER TABLE client_submissions ADD COLUMN source_filename TEXT",
+            "ALTER TABLE client_submissions ADD COLUMN source_module TEXT",
+            "ALTER TABLE client_submissions ADD COLUMN raw_request_path TEXT",
+            "ALTER TABLE test_runs ADD COLUMN rule_selection JSON",
+            "ALTER TABLE test_runs ADD COLUMN segmented_summary JSON",
             "CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, action TEXT, success BOOLEAN, ip_address TEXT, detail TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
         ]:
             try:

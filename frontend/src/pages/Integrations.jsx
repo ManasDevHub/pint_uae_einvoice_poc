@@ -476,14 +476,55 @@ export default function Integrations() {
                           <input type="text" value={formData.sftp_username || ''} onChange={e => setFormData({...formData, sftp_username: e.target.value})} className="w-full mt-1 p-2 bg-white border border-[#e3eaf7] rounded" />
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-[#5a6a85]">FOLDER PATH</label>
-                          <input type="text" value={formData.sftp_path || ''} onChange={e => setFormData({...formData, sftp_path: e.target.value})} className="w-full mt-1 p-2 bg-white border border-[#e3eaf7] rounded" />
+                          <label className="text-[10px] font-bold text-[#5a6a85]">POLL FREQUENCY</label>
+                          <select value={formData.poll_interval_minutes || 15} onChange={e => setFormData({...formData, poll_interval_minutes: parseInt(e.target.value)})} className="w-full mt-1 p-2 bg-white border border-[#e3eaf7] rounded">
+                             <option value="5">Every 5 Minutes</option>
+                             <option value="15">Every 15 Minutes</option>
+                             <option value="60">Hourly</option>
+                             <option value="1440">Daily</option>
+                          </select>
                         </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[#5a6a85]">RSA PRIVATE KEY (PEM)</label>
+                        <textarea 
+                          placeholder="-----BEGIN RSA PRIVATE KEY-----..." 
+                          className="w-full h-32 p-2 font-mono text-[10px] bg-white border border-[#e3eaf7] rounded outline-none focus:border-[#1a6fcf]"
+                          value={formData.sftp_private_key || (formData.encrypted_credentials ? JSON.parse(formData.encrypted_credentials).sftp_private_key : '')}
+                          onChange={e => {
+                            const creds = formData.encrypted_credentials ? JSON.parse(formData.encrypted_credentials) : {};
+                            creds.sftp_private_key = e.target.value;
+                            setFormData({...formData, encrypted_credentials: JSON.stringify(creds), sftp_private_key: e.target.value});
+                          }}
+                        />
                       </div>
                     </Card>
                   )}
 
-                  {formData.integration_mode === 'api_push' && (
+                  {formData.integration_mode === 'webhook' && (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-[#e8f1ff] rounded-xl border border-[#1a6fcf]/20 flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] font-bold text-[#1a6fcf] uppercase">Your Unique Webhook URL</p>
+                          <code className="text-xs font-mono text-[#1a2340]">{formData.webhook_url || 'https://adamas-einvoice.koyeb.app/api/v1/integrations/webhook/...'}</code>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => copyToClipboard(formData.webhook_url)}><Copy className="w-4 h-4" /></Button>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-[#1a2340] uppercase">Inbound HMAC Secret</label>
+                        <input 
+                          type="text" 
+                          placeholder="Your custom secret key..." 
+                          value={formData.webhook_secret || ''} 
+                          onChange={e => setFormData({...formData, webhook_secret: e.target.value})}
+                          className="w-full p-3 bg-[#f8faff] border border-[#e3eaf7] rounded-lg focus:ring-2 focus:ring-[#1a6fcf] outline-none"
+                        />
+                        <p className="text-[10px] text-[#8899b0]">Your ERP must send this in the `X-Webhook-Signature` header (HMAC-SHA256).</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.integration_mode === 'api_push' && !['sftp', 'webhook', 'api_pull'].includes(formData.integration_mode) && (
                     <div className="p-4 bg-[#e8f1ff] rounded-xl border border-[#1a6fcf]/20 flex items-center justify-between">
                       <div>
                         <p className="text-[10px] font-bold text-[#1a6fcf] uppercase">Your Validation Endpoint</p>

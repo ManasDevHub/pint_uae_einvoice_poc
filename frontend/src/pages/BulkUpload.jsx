@@ -3,7 +3,8 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Pill from '../components/ui/Pill'
 import ProgressBar from '../components/ui/ProgressBar'
-import { Upload, FileDown, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react'
+import { Upload, FileDown, RefreshCw, AlertCircle, CheckCircle, Send } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { API_BASE } from '../constants/api'
 import { API_HEADERS } from '../constants/apiHelpers'
 
@@ -14,6 +15,7 @@ export default function BulkUpload() {
   const [progress, setProgress] = useState(null)
   const [results, setResults] = useState([])
   const [fullPipeline, setFullPipeline] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const fileInputRef = useRef(null)
 
   const handleDrag = (e) => {
@@ -163,6 +165,38 @@ export default function BulkUpload() {
   }
 
   const hasFailures = results.some(r => !r.is_valid)
+  const validResultsCount = results.filter(r => r.is_valid && r.raw_payload).length
+
+  const handleSendToASP = async () => {
+    const validOnes = results.filter(r => r.is_valid);
+    if (validOnes.length === 0) return toast.error("No valid invoices to send.");
+
+    setIsSubmitting(true);
+    const t = toast.loading(`Initiating ASP/FTA submission for ${validOnes.length} invoices...`);
+    try {
+      const invoiceNumbers = validOnes.map(v => v.invoice_number);
+      
+      const res = await fetch(`${API_BASE}/asp/v1/submit-validated?source_module=Bulk%20Upload&source_filename=${encodeURIComponent(file?.name || 'bulk_upload.xlsx')}`, {
+        method: 'POST',
+        headers: API_HEADERS,
+        body: JSON.stringify(invoiceNumbers)
+      });
+      
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      
+      toast.success(`Successfully sent ${data.submitted} invoices to ASP! Logs available in ASP Portal.`, { 
+        id: t,
+        duration: 5000
+      });
+      
+    } catch (e) {
+      console.error(e);
+      toast.error("ASP Submission failed: " + e.message, { id: t });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -258,12 +292,25 @@ export default function BulkUpload() {
         <Card className="flex flex-col">
           <div className="p-4 border-b border-[#e3eaf7] flex justify-between items-center">
             <h2 className="text-lg font-semibold text-[#1a2340]">Validation Results</h2>
-            {hasFailures && !uploading && (
-              <Button variant="danger" className="ml-auto animate-pulse" onClick={resubmitFailed}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Resubmit Failed Rows
-              </Button>
-            )}
+            <div className="flex gap-2 ml-auto">
+              {validResultsCount > 0 && !uploading && (
+                <Button 
+                  variant="primary" 
+                  disabled={isSubmitting} 
+                  onClick={handleSendToASP}
+                  className="bg-[#1a2340] hover:bg-[#111827] border-none shadow-lg transform active:scale-95 transition-all px-6"
+                >
+                  {isSubmitting ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                  Send {validResultsCount} Invoices to ASP Portal
+                </Button>
+              )}
+              {hasFailures && !uploading && (
+                <Button variant="danger" className="animate-pulse" onClick={resubmitFailed}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Resubmit Failed Rows
+                </Button>
+              )}
+            </div>
           </div>
           <div className="flex-1 overflow-x-auto min-h-[300px]">
             <table className="w-full text-left text-sm whitespace-nowrap">

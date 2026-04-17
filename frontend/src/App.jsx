@@ -13,6 +13,10 @@ import Integrations from './pages/Integrations'
 import Settings from './pages/Settings'
 import Users from './pages/Users'
 import Reports from './pages/Reports'
+import ERPAnalytics from './pages/ERPAnalytics'
+import AuditPortal from './pages/AuditPortal'
+import Sandbox from './pages/Sandbox'
+import QAStudio from './pages/QAStudio'
 
 function ProtectedRoutes() {
   const { isAuthenticated } = useAuth()
@@ -27,6 +31,10 @@ function ProtectedRoutes() {
         <Route path="/history"      element={<History />} />
         <Route path="/analytics"    element={<Analytics />} />
         <Route path="/reports"      element={<Reports />} />
+        <Route path="/erp-analytics" element={<ERPAnalytics />} />
+        <Route path="/audit-portal" element={<AuditPortal />} />
+        <Route path="/sandbox" element={<Sandbox />} />
+        <Route path="/qa-studio" element={<QAStudio />} />
         <Route path="/integrations" element={<Integrations />} />
         <Route path="/settings"     element={<Settings />} />
         <Route path="/users"        element={<Users />} />
