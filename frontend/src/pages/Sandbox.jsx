@@ -123,7 +123,7 @@ export default function Sandbox() {
                  const url = window.URL.createObjectURL(new Blob([res.data]))
                  const link = document.createElement('a')
                  link.href = url
-                 link.setAttribute('download', 'PINT_AE_Sandbox_Template.csv')
+                 link.setAttribute('download', 'PINT_AE_Sandbox_Template.xlsx')
                  document.body.appendChild(link)
                  link.click()
                  document.body.removeChild(link)

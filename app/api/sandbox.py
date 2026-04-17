@@ -34,9 +34,8 @@ async def sandbox_bulk_validate(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid file format: {str(e)}")
         
-    df.columns = [str(c).strip().lower() for c in df.columns]
-    
-    # Required headers as defined in the template (simplified lowercase check)
+    # Required headers as defined in the template (flexible space/underscore check)
+    df.columns = [str(c).strip().lower().replace("_", " ").replace("  ", " ") for c in df.columns]
     required = ["invoice number", "issue date", "seller trn", "buyer name"]
     missing = [r for r in required if r not in df.columns]
     
@@ -174,12 +173,16 @@ async def get_all_rules():
 
 @router.get("/download-template")
 async def download_sandbox_template():
-    """Download a CSV template with the 51 mandatory PINT AE fields."""
-    import csv
+    """Download a professional Excel (.xlsx) template with the 51 mandatory PINT AE fields."""
     import io
-    from fastapi.responses import StreamingResponse
+    from openpyxl import Workbook
+    from openpyxl.responses import StreamingResponse
+    from fastapi.responses import StreamingResponse as FastAPIStreamingResponse
     
-    # Standard 51 Fields for PINT AE (Simplified for Demo)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sandbox_Template"
+    
     headers = [
         "Invoice Number", "Issue Date", "Invoice Type Code", "Currency", 
         "Seller TRN", "Seller Name", "Seller Address", "Seller City", 
@@ -191,7 +194,6 @@ async def download_sandbox_template():
         "Payable Amount", "VAT Amount", "Transaction Type Code", "Business Process Type"
     ]
     
-    # Sample Data Types
     sample_row = [
         "INV001", "2026-04-17", "380", "AED",
         "100123456700003", "Alpha Trading LLC", "Sheikh Zayed Rd", "Dubai",
@@ -203,13 +205,15 @@ async def download_sandbox_template():
         "5250.00", "250.00", "01000000", "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0"
     ]
     
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(headers)
-    writer.writerow(sample_row)
+    ws.append(headers)
+    ws.append(sample_row)
     
-    return StreamingResponse(
-        io.BytesIO(output.getvalue().encode()),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=PINT_AE_Sandbox_Template.csv"}
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    
+    return FastAPIStreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="PINT_AE_Sandbox_Template.xlsx"'}
     )

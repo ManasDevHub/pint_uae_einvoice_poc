@@ -25,10 +25,10 @@ class TokenResponse(BaseModel):
 class UserOut(BaseModel):
     id: int
     username: str
-    email: str
-    full_name: str
-    role: str
-    status: str
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    status: Optional[str] = None
     avatar: Optional[str] = None
     last_login: Optional[datetime] = None
     created_at: Optional[datetime] = None

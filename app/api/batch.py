@@ -254,7 +254,7 @@ async def download_template():
     return StreamingResponse(
         stream,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=PINT_AE_Bulk_Template.xlsx"},
+        headers={"Content-Disposition": 'attachment; filename="PINT_AE_Bulk_Template.xlsx"'},
     )
 
 
@@ -275,7 +275,7 @@ async def download_template_csv():
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=PINT_AE_Bulk_Template.csv"},
+        headers={"Content-Disposition": 'attachment; filename="PINT_AE_Bulk_Template.csv"'},
     )
 
 
