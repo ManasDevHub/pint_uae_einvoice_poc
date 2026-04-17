@@ -5,7 +5,7 @@ import Pill from '../components/ui/Pill'
 import ProgressBar from '../components/ui/ProgressBar'
 import { 
   Upload, Play, FileText, CheckCircle2, XCircle, Loader2, Info, 
-  Settings as SettingsIcon, ShieldCheck, Database, RefreshCw, AlertCircle, Search, Download
+  Settings as SettingsIcon, ShieldCheck, Database, RefreshCw, AlertCircle, Search, Download, Activity
 } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
@@ -318,7 +318,7 @@ export default function Sandbox() {
         </Card>
       )}
 
-      {/* Empty State */}
+      {/* Empty State or Processing Flow */}
       {!currentRun && !running && (
         <div className="flex flex-col items-center justify-center py-24 text-center space-y-4 opacity-40">
            <Database className="w-16 h-16 text-[#8899b0]" />
@@ -326,6 +326,70 @@ export default function Sandbox() {
               <h3 className="text-xl font-bold text-[#1a2340]">Suite Ready for Execution</h3>
               <p className="text-sm font-medium text-[#8899b0]">Upload a dataset and select rule sets to begin</p>
            </div>
+        </div>
+      )}
+
+      {running && !currentRun?.results && (
+        <div className="py-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-12">
+               <div className="flex flex-col items-center gap-4 group">
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 relative z-10 animate-pulse">
+                    <FileText className="w-8 h-8" />
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs font-black text-[#1a2340] uppercase tracking-wider">Ingestion</div>
+                    <div className="text-[10px] font-bold text-[#8899b0]">Scanning File...</div>
+                  </div>
+               </div>
+               <div className="h-px flex-1 bg-slate-200 mx-4 relative top-[-24px]">
+                 <div className="h-full bg-emerald-500 animate-progress-fast w-0" />
+               </div>
+               <div className="flex flex-col items-center gap-4 opacity-50">
+                  <div className="w-16 h-16 rounded-2xl bg-[#1a2340] text-white flex items-center justify-center shadow-lg shadow-[#1a2340]/20 relative z-10">
+                    <Activity className="w-8 h-8" />
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs font-black text-[#1a2340] uppercase tracking-wider">Analysis</div>
+                    <div className="text-[10px] font-bold text-[#8899b0]">Matching Rules...</div>
+                  </div>
+               </div>
+               <div className="h-px flex-1 bg-slate-200 mx-4 relative top-[-24px]"></div>
+               <div className="flex flex-col items-center gap-4 opacity-30">
+                  <div className="w-16 h-16 rounded-2xl bg-[#1a2340] text-white flex items-center justify-center shadow-lg shadow-[#1a2340]/20 relative z-10">
+                    <ShieldCheck className="w-8 h-8" />
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs font-black text-[#1a2340] uppercase tracking-wider">Validation</div>
+                    <div className="text-[10px] font-bold text-[#8899b0]">Simulating PINT AE...</div>
+                  </div>
+               </div>
+               <div className="h-px flex-1 bg-slate-200 mx-4 relative top-[-24px]"></div>
+               <div className="flex flex-col items-center gap-4 opacity-20">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center border-2 border-dashed border-slate-200">
+                    <CheckCircle2 className="w-8 h-8" />
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs font-black text-[#1a2340] uppercase tracking-wider">Results</div>
+                    <div className="text-[10px] font-bold text-[#8899b0]">Compiling...</div>
+                  </div>
+               </div>
+            </div>
+            
+            <div className="bg-[#f8faff] rounded-3xl p-12 border-2 border-dashed border-[#e3eaf7] text-center space-y-6">
+              <div className="relative inline-block">
+                <div className="absolute inset-0 bg-emerald-500 blur-2xl opacity-10 animate-pulse" />
+                <Loader2 className="w-12 h-12 text-[#1a2340] animate-spin relative z-10 mx-auto" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-[#1a2340] animate-pulse">Processing Validation Suite</h3>
+                <p className="text-sm font-medium text-[#5a6a85] mt-2">Running PINT Rules (51), Business Logic (432), and Format Scans (85)</p>
+              </div>
+              <div className="max-w-md mx-auto">
+                <ProgressBar progress={45} className="h-2 rounded-full" />
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

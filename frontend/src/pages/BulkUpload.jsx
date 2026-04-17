@@ -63,8 +63,15 @@ export default function BulkUpload() {
             setUploading(false)
             if (data.status === 'COMPLETE') {
               setResults(data.results || [])
+              toast.success(`Successfully processed ${data.total} invoices.`)
             } else {
-              toast.error(data.error_message || "Processing failed. Please check your template format.", { duration: 6000 })
+              // Priority: surfaced error message from backend extraction check
+              const errorMsg = data.error_message || "Template validation failed. Please check field headers and data types.";
+              toast.error(errorMsg, { 
+                duration: 8000, 
+                position: 'top-center',
+                style: { border: '1px solid #e53e3e', padding: '16px', color: '#1a2340', fontWeight: 'bold' } 
+              })
               setProgress(null)
             }
           }

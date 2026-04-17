@@ -59,3 +59,22 @@
 .json-editor:focus {
   background-color: transparent;
 }
+
+@keyframes progress-fast {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-progress-fast {
+  animation: progress-fast 1.5s infinite linear;
+}
+
+.animate-fade-up {
+  animation: fade-up 0.5s ease-out forwards;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

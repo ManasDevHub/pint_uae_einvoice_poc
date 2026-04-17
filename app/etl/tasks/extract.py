@@ -112,7 +112,7 @@ def extract_excel(job_id: str, file_bytes_hex: str, filename: str, tenant_id: st
         mandatory = ["invoice_number", "invoice_date", "seller_trn", "buyer_name"]
         missing = [m for m in mandatory if m not in df.columns]
         if missing:
-            raise ValueError(f"Wrong format data. Missing required columns: {', '.join(missing)}")
+            raise ValueError("Invalid template format. Please download and use the professional PINT AE Template (CSV/Excel) to ensure correct processing.")
 
         raw_records = df.to_dict("records")
         # 1. Clean data (coercion, TRN padding)
