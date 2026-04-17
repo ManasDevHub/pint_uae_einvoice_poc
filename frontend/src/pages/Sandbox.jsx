@@ -5,7 +5,7 @@ import Pill from '../components/ui/Pill'
 import ProgressBar from '../components/ui/ProgressBar'
 import { 
   Upload, Play, FileText, CheckCircle2, XCircle, Loader2, Info, 
-  Settings as SettingsIcon, ShieldCheck, Database, RefreshCw, AlertCircle, Search
+  Settings as SettingsIcon, ShieldCheck, Database, RefreshCw, AlertCircle, Search, Download
 } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
@@ -96,9 +96,6 @@ export default function Sandbox() {
     <div className="p-8 max-w-[1400px] mx-auto animate-in fade-in duration-500 space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="bg-[#1a2340] p-3 rounded-2xl shadow-lg">
-            <ShieldCheck className="w-6 h-6 text-emerald-400" />
-          </div>
           <div>
             <h1 className="text-3xl font-black text-[#1a2340] tracking-tight">Test Sandbox</h1>
             <p className="text-[#5a6a85] font-medium">Compliance & Regulatory Validation Studio (568 test cases)</p>
@@ -142,7 +139,7 @@ export default function Sandbox() {
              }`}
              onClick={() => fileInputRef.current?.click()}
           >
-             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".csv, .xlsx, .xls" />
              <Upload className={`w-8 h-8 mx-auto mb-4 ${file ? 'text-emerald-500' : 'text-[#8899b0]'}`} />
              {file ? (
                <div className="text-sm font-bold text-[#1a2340] truncate">{file.name}</div>
@@ -178,7 +175,7 @@ export default function Sandbox() {
                   includeBusiness ? 'border-blue-500 bg-blue-50' : 'border-[#e3eaf7] bg-white'
                 }`}
               >
-                <span className={`text-xs font-bold ${includeBusiness ? 'text-blue-700' : 'text-[#5a6a85]'}`}>Business Logic & Tax</span>
+                <span className={`text-xs font-bold ${includeBusiness ? 'text-blue-700' : 'text-[#5a6a85]'}`}>Business Logic & Tax (432 Rules)</span>
                 <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${includeBusiness ? 'border-blue-500 bg-blue-500' : 'border-slate-300'}`}>
                   {includeBusiness && <CheckCircle2 className="w-2.5 h-2.5 text-white" />}
                 </div>
@@ -190,7 +187,7 @@ export default function Sandbox() {
                   includeFormat ? 'border-amber-500 bg-amber-50' : 'border-[#e3eaf7] bg-white'
                 }`}
               >
-                <span className={`text-xs font-bold ${includeFormat ? 'text-amber-700' : 'text-[#5a6a85]'}`}>Data Format & Schema</span>
+                <span className={`text-xs font-bold ${includeFormat ? 'text-amber-700' : 'text-[#5a6a85]'}`}>Data Format & Schema (85 Rules)</span>
                 <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${includeFormat ? 'border-amber-500 bg-amber-500' : 'border-slate-300'}`}>
                   {includeFormat && <CheckCircle2 className="w-2.5 h-2.5 text-white" />}
                 </div>
@@ -232,20 +229,41 @@ export default function Sandbox() {
                 <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#1a6fcf] mb-2">Execution Outcome</div>
                 <h2 className="text-3xl font-black">{currentRun.status === 'COMPLETED' ? `Pass Rate: ${currentRun.pass_rate?.toFixed(1)}%` : 'Processing...'}</h2>
               </div>
-              <div className="flex gap-8">
-                <div className="text-center">
-                  <div className="text-2xl font-black text-emerald-400">{currentRun.passed || 0}</div>
-                  <div className="text-[10px] font-black uppercase text-slate-400">Passed</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-black text-rose-500">{currentRun.failed || 0}</div>
-                  <div className="text-[10px] font-black uppercase text-slate-400">Failed</div>
-                </div>
-                <div className="text-center border-l border-white/10 pl-8">
-                  <div className="text-2xl font-black">{currentRun.total || 0}</div>
-                  <div className="text-[10px] font-black uppercase text-slate-400">Rules Run</div>
-                </div>
-              </div>
+              <div className="flex gap-4">
+                  <Button 
+                    variant="ghost" 
+                    className="bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold"
+                    onClick={async () => {
+                       const res = await axios.get(`${API_BASE}/export/${currentRun.run_id}`, {
+                         responseType: 'blob',
+                         headers: getApiHeaders(token)
+                       })
+                       const url = window.URL.createObjectURL(new Blob([res.data]))
+                       const link = document.createElement('a')
+                       link.href = url
+                       link.setAttribute('download', `Sandbox_Results_${currentRun.run_id}.csv`)
+                       document.body.appendChild(link)
+                       link.click()
+                       document.body.removeChild(link)
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2" /> Export Validation Report
+                  </Button>
+                  <div className="flex gap-8 border-l border-white/10 pl-8">
+                    <div className="text-center">
+                      <div className="text-2xl font-black text-emerald-400">{currentRun.passed || 0}</div>
+                      <div className="text-[10px] font-black uppercase text-slate-400">Passed</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-black text-rose-500">{currentRun.failed || 0}</div>
+                      <div className="text-[10px] font-black uppercase text-slate-400">Failed</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-black">{currentRun.total || 0}</div>
+                      <div className="text-[10px] font-black uppercase text-slate-400">Rules Run</div>
+                    </div>
+                  </div>
+               </div>
             </div>
           </div>
 
