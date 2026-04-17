@@ -22,7 +22,7 @@ export default function Sidebar() {
 
   const portalItems = [
     { icon: ShieldCheck, label: 'ASP Portal', path: '/audit-portal' },
-    { icon: Database, label: 'PINT AE Sandbox', path: '/sandbox' },
+    { icon: Database, label: 'Test Sandbox', path: '/sandbox' },
   ]
 
   const sysItems = [

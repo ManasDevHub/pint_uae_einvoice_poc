@@ -146,7 +146,8 @@ def extract_excel(job_id: str, file_bytes_hex: str, filename: str, tenant_id: st
         
         log.error(f"ETL Extract failed: job={job_id}, error={exc}")
         from celery import current_task
-        if current_task:
+        # Do not retry on configuration/format errors (ValueError)
+        if current_task and not isinstance(exc, ValueError):
             raise current_task.retry(exc=exc, countdown=5)
         raise exc
     finally:

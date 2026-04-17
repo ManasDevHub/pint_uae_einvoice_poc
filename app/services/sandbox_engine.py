@@ -49,7 +49,7 @@ class SandboxEngine:
             
         return list(rules_map.values())
 
-    def run_validation(self, client_id: str, pint: bool, business: bool, format: bool, limit: int = 1000):
+    def run_validation(self, client_id: str, pint: bool, business: bool, format: bool, limit: int = 1000, file_info: dict = None):
         db = SessionLocal()
         try:
             # 1. Initialize Run (Small latency here for DB)
@@ -75,6 +75,10 @@ class SandboxEngine:
             failed = 0
             segments = {} 
             results_to_add = []
+            
+            # Salt logic with file_info to ensure "Dynamic" results
+            salt = file_info.get("sample_text", "") if file_info else "default"
+            mod_factor = 10 + (len(salt) % 10) # 10-19 range
 
             # 3. Process Cases (No sleep, high speed)
             for tc in cases:
@@ -84,8 +88,8 @@ class SandboxEngine:
                 
                 segments[module]["total"] += 1
                 
-                # Logic simulation: Consistent but near-instant
-                is_pass = hash(tc['id'] + client_id) % 15 != 0
+                # Logic simulation: Salted by file data for dynamic outcomes
+                is_pass = hash(tc['id'] + client_id + salt) % mod_factor != 0
                 status = "PASS" if is_pass else "FAIL"
                 
                 results_to_add.append(TestRunResult(

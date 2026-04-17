@@ -44,6 +44,10 @@ export default function Sandbox() {
       if (res.data.status === 'COMPLETED') {
         setRunning(false)
         toast.success("Sandbox execution completed!")
+      } else if (res.data.status === 'FAILED') {
+        setRunning(false)
+        toast.error(res.data.error_message || "Sandbox execution failed due to format error.")
+        setCurrentRun(prev => ({ ...prev, status: 'FAILED' }))
       }
     } catch (err) {
       console.error("Status check failed")
@@ -80,9 +84,10 @@ export default function Sandbox() {
         }
       })
       setCurrentRun({ run_id: res.data.run_id, status: 'RUNNING' })
-      toast.success("Extraction & Validation started", { id: t })
+      toast.success("Sandbox processing started", { id: t })
     } catch (err) {
-      toast.error("Execution failed to start", { id: t })
+      const msg = err.response?.data?.detail || "Execution failed to start"
+      toast.error(msg, { id: t })
       setRunning(false)
     }
   }
@@ -95,7 +100,7 @@ export default function Sandbox() {
             <ShieldCheck className="w-6 h-6 text-emerald-400" />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-[#1a2340] tracking-tight">PINT AE Sandbox</h1>
+            <h1 className="text-3xl font-black text-[#1a2340] tracking-tight">Test Sandbox</h1>
             <p className="text-[#5a6a85] font-medium">Compliance & Regulatory Validation Studio (568 test cases)</p>
           </div>
         </div>
@@ -212,7 +217,7 @@ export default function Sandbox() {
                 className="w-full h-14 rounded-2xl bg-[#1a2340] hover:bg-black text-white font-bold shadow-xl shadow-[#1a2340]/20 flex items-center justify-center gap-2"
              >
                 {running ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-                {running ? 'Processing...' : 'Run Sandbox Suite'}
+                {running ? 'Processing...' : 'Run Sandbox'}
              </Button>
           </div>
         </Card>

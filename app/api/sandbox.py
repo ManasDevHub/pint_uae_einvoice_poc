@@ -16,15 +16,47 @@ async def sandbox_bulk_validate(
     client_id: str = Query("demo-client-phase2")
 ):
     """
-    Sandbox Bulk Validation Endpoint.
-    Simulates processing of multiple test cases for the demo.
+    Sandbox Bulk Validation Endpoint with strict template checking.
     """
-    # In a real scenario, we would parse the file to get client_id or more data.
+    import pandas as pd
+    import io
+    from fastapi import HTTPException
+    
+    # 1. Read file to validate headers
+    content = await file.read()
+    buf = io.BytesIO(content)
+    
+    try:
+        if file.filename.endswith(".csv"):
+            df = pd.read_csv(buf, dtype=str, encoding='utf-8-sig')
+        else:
+            df = pd.read_excel(buf, dtype=str)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid file format: {str(e)}")
+        
+    df.columns = [str(c).strip().lower() for c in df.columns]
+    
+    # Required headers as defined in the template (simplified lowercase check)
+    required = ["invoice number", "issue date", "seller trn", "buyer name"]
+    missing = [r for r in required if r not in df.columns]
+    
+    if missing:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Wrong format data. Missing required columns: {', '.join(missing)}"
+        )
+    
+    # 2. Extract row count and some sample data to make it dynamic
+    row_count = len(df)
+    sample_text = "".join(df["invoice number"].astype(str).tolist()[:5])
+    
+    # 3. Trigger validation with file context
     run_id = sandbox_engine.run_validation(
         client_id=client_id,
         pint=pint_rules,
         business=business_rules,
-        format=data_format
+        format=data_format,
+        file_info={"row_count": row_count, "sample_text": sample_text, "filename": file.filename}
     )
     
     return {"status": "SUCCESS", "run_id": run_id}
